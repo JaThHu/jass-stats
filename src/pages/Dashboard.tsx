@@ -34,24 +34,26 @@ export default function Dashboard() {
       </div>
 
       {/* Filter */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Von</label>
-          <input
-            type="date"
-            value={filterFrom}
-            onChange={(e) => setFilterFrom(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Bis</label>
-          <input
-            type="date"
-            value={filterTo}
-            onChange={(e) => setFilterTo(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label className="block text-xs text-gray-500 mb-1">Von</label>
+            <input
+              type="date"
+              value={filterFrom}
+              onChange={(e) => setFilterFrom(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-xs text-gray-500 mb-1">Bis</label>
+            <input
+              type="date"
+              value={filterTo}
+              onChange={(e) => setFilterTo(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
         </div>
         {(filterFrom || filterTo) && (
           <button
@@ -92,32 +94,32 @@ export default function Dashboard() {
           </div>
 
           {/* Rangliste Tabelle */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
+            <table className="w-full min-w-[320px]">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">#</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Spieler</th>
+                  <th className="text-left px-2 sm:px-4 py-3 text-xs font-semibold text-gray-500 uppercase">#</th>
+                  <th className="text-left px-2 sm:px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Spieler</th>
                   <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase">{CHRITZ_ICONS.match}</th>
                   <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase">{CHRITZ_ICONS.bergpreis}</th>
                   <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase">{CHRITZ_ICONS.sieg}</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total</th>
+                  <th className="text-center px-2 sm:px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {stats.map((s, i) => (
                   <tr key={s.playerId} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-bold text-gray-400">
+                    <td className="px-2 sm:px-4 py-3 font-bold text-gray-400">
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                     </td>
-                    <td className="px-4 py-3 font-semibold text-gray-800">
+                    <td className="px-2 sm:px-4 py-3 font-semibold text-gray-800">
                       {playerMap[s.playerId] ?? '?'}
-                      <span className="ml-2 text-xs text-gray-400 font-normal">{s.sessions} Abende</span>
+                      <span className="hidden sm:inline ml-2 text-xs text-gray-400 font-normal">{s.sessions} Abende</span>
                     </td>
                     <td className="px-2 py-3 text-center text-gray-700">{s.match || '—'}</td>
                     <td className="px-2 py-3 text-center text-gray-700">{s.bergpreis || '—'}</td>
                     <td className="px-2 py-3 text-center text-gray-700">{s.sieg || '—'}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-2 sm:px-4 py-3 text-center">
                       <span className="inline-block bg-green-100 text-green-800 font-bold text-sm px-3 py-0.5 rounded-full">
                         {s.total}
                       </span>
