@@ -96,10 +96,11 @@ export function computePlayerStats(
 
     for (const entry of session.chritz) {
       const teamPlayers = session.teams[entry.teamIndex];
+      const points = entry.type === 'sieg' ? 2 : 1;
       for (const playerId of teamPlayers) {
         const stats = statsMap.get(playerId);
         if (stats) {
-          stats.total += 1;
+          stats.total += points;
           stats[entry.type as ChritzType] += 1;
         }
       }
@@ -125,7 +126,9 @@ export function getPlayerHistory(data: AppData, playerId: string): SessionPoint[
   let cumulative = 0;
   return playerSessions.map((s) => {
     const teamIndex = s.teams[0].includes(playerId) ? 0 : 1;
-    const chritz = s.chritz.filter((c) => c.teamIndex === teamIndex).length;
+    const chritz = s.chritz
+      .filter((c) => c.teamIndex === teamIndex)
+      .reduce((sum, c) => sum + (c.type === 'sieg' ? 2 : 1), 0);
     cumulative += chritz;
     return {
       date: s.date,
