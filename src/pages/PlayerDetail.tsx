@@ -138,7 +138,7 @@ export default function PlayerDetail() {
                 const myTeam = session.teams[myTeamIdx];
                 const otherTeam = session.teams[myTeamIdx === 0 ? 1 : 0];
                 const partnerIds = myTeam.filter((pid) => pid !== id);
-                const myChritz = session.chritz.filter((c) => c.teamIndex === myTeamIdx).length;
+                const myChritz = session.chritz.filter((c) => c.teamIndex === myTeamIdx).reduce((sum, c) => sum + (c.type === 'sieg' ? 2 : 1), 0);
 
                 return (
                   <tr key={session.id} className="border-b border-gray-50 hover:bg-gray-50">

@@ -78,7 +78,7 @@ export default function Sessions() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-green-700 bg-green-50 px-2.5 py-0.5 rounded-full">
-                  {session.chritz.length} Chritz
+                  {session.chritz.reduce((sum, c) => sum + (c.type === 'sieg' ? 2 : 1), 0)} Chritz
                 </span>
                 <span className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
               </div>
