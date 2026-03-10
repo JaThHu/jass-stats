@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, CSSProperties } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 
 // ===== Types =====
 interface SideState {
@@ -73,7 +74,7 @@ function TallyGroup2() {
 }
 
 function renderTally(count: number, type: '100' | '50' | '20') {
-  const items: JSX.Element[] = [];
+  const items: ReactElement[] = [];
   if (type === '50') {
     const pairs = Math.floor(count / 2), single = count % 2;
     for (let i = 0; i < pairs; i++) items.push(<TallyGroup2 key={`p${i}`} />);
