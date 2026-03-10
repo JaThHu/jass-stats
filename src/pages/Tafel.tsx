@@ -480,11 +480,25 @@ export default function Tafel() {
               Positiv (z.B. 9) oder negativ (z.B. -4). Wird zur bestehenden Restzahl addiert.
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                style={{
+                  padding: '10px 12px',
+                  fontFamily: "'Permanent Marker', cursive",
+                  fontSize: '1.1rem', border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '6px', cursor: 'pointer',
+                  color: '#e8f5e9', background: 'rgba(255,255,255,0.07)',
+                  minWidth: '42px',
+                }}
+                onClick={() => setRestVal(v => v.startsWith('-') ? v.slice(1) : '-' + (v || '0'))}
+              >±</button>
               <input
                 ref={restInputRef}
-                type="number" inputMode="numeric"
+                type="text" inputMode="numeric"
                 value={restVal}
-                onChange={e => setRestVal(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (/^-?\d*$/.test(val)) setRestVal(val);
+                }}
                 onKeyDown={e => e.key === 'Enter' && commitRest()}
                 placeholder="z.B. 9 oder -4"
                 style={{
