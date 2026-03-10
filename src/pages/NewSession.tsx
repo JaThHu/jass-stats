@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../AppContext';
 import { addSession } from '../store';
@@ -11,15 +11,45 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+const SESSION_DRAFT_KEY = 'neuer-abend-draft-v1';
+
+interface Draft {
+  step: Step;
+  date: string;
+  team0: string[];
+  team1: string[];
+  chritz: ChritzEntry[];
+}
+
+function loadDraft(): Draft | null {
+  try {
+    const raw = localStorage.getItem(SESSION_DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveDraft(draft: Draft) {
+  try { localStorage.setItem(SESSION_DRAFT_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(SESSION_DRAFT_KEY); } catch { /* ignore */ }
+}
+
 export default function NewSession() {
   const { data, update } = useApp();
   const navigate = useNavigate();
 
-  const [step, setStep] = useState<Step>('datum');
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [team0, setTeam0] = useState<string[]>([]);
-  const [team1, setTeam1] = useState<string[]>([]);
-  const [chritz, setChritz] = useState<ChritzEntry[]>([]);
+  const [step, setStep] = useState<Step>(() => loadDraft()?.step ?? 'datum');
+  const [date, setDate] = useState(() => loadDraft()?.date ?? new Date().toISOString().slice(0, 10));
+  const [team0, setTeam0] = useState<string[]>(() => loadDraft()?.team0 ?? []);
+  const [team1, setTeam1] = useState<string[]>(() => loadDraft()?.team1 ?? []);
+  const [chritz, setChritz] = useState<ChritzEntry[]>(() => loadDraft()?.chritz ?? []);
+
+  // Persist draft on every change
+  useEffect(() => {
+    saveDraft({ step, date, team0, team1, chritz });
+  }, [step, date, team0, team1, chritz]);
 
   const players = data.players;
 
@@ -57,6 +87,7 @@ export default function NewSession() {
       chritz,
     });
     update(newData);
+    clearDraft();
     navigate('/abende');
   }
 

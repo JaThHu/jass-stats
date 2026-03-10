@@ -7,6 +7,7 @@ import Sessions from './pages/Sessions';
 import Players from './pages/Players';
 import PlayerDetail from './pages/PlayerDetail';
 import Rotation from './pages/Rotation';
+import Tafel from './pages/Tafel';
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/spieler" element={<Players />} />
             <Route path="/spieler/:id" element={<PlayerDetail />} />
             <Route path="/rotation" element={<Rotation />} />
+            <Route path="/tafel" element={<Tafel />} />
           </Route>
         </Routes>
       </BrowserRouter>
