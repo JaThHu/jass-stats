@@ -6,6 +6,7 @@ const navItems = [
   { to: '/abende', label: 'Abende', short: 'Abende', icon: '📅' },
   { to: '/spieler', label: 'Spieler', short: 'Spieler', icon: '👥' },
   { to: '/rotation', label: 'Rotation', short: 'Rotation', icon: '🔄' },
+  { to: '/tafel', label: 'Jasstafel', short: 'Tafel', icon: '📋' },
 ];
 
 export default function Layout() {
