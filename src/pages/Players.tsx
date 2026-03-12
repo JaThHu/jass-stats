@@ -34,24 +34,26 @@ export default function Players() {
     setDeleteConfirmId(null);
   }
 
-  // Count sessions per player
   const sessionCount = (playerId: string) =>
     data.sessions.filter((s) => [...s.teams[0], ...s.teams[1]].includes(playerId)).length;
 
+  // Fixed: Sieg counts as 2 points
   const totalChritz = (playerId: string) =>
     data.sessions.reduce((sum, s) => {
       const teamIdx = s.teams[0].includes(playerId) ? 0 : s.teams[1].includes(playerId) ? 1 : null;
       if (teamIdx === null) return sum;
-      return sum + s.chritz.filter((c) => c.teamIndex === teamIdx).length;
+      return sum + s.chritz
+        .filter((c) => c.teamIndex === teamIdx)
+        .reduce((pts, c) => pts + (c.type === 'sieg' ? 2 : 1), 0);
     }, 0);
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Spieler</h2>
+    <div className="space-y-4">
+      <h2 className="text-2xl font-bold tracking-tight text-gray-900">Spieler</h2>
 
       {/* Add player */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h3 className="text-sm font-semibold text-gray-500 mb-3">Neuer Spieler</h3>
+      <div className="bg-white rounded-2xl shadow-sm p-4">
+        <p className="text-xs font-semibold text-gray-500 tracking-wide mb-3">NEUER SPIELER</p>
         <div className="flex gap-2">
           <input
             type="text"
@@ -59,33 +61,36 @@ export default function Players() {
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
             placeholder="Name eingeben..."
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="flex-1 bg-gray-100 rounded-xl px-4 py-3 text-base outline-none focus:bg-gray-200 transition-colors"
           />
           <button
             onClick={handleAdd}
             disabled={!newName.trim()}
-            className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="bg-green-700 text-white px-5 py-3 rounded-xl font-semibold disabled:opacity-40 transition-opacity active:bg-green-800"
           >
-            Hinzufügen
+            +
           </button>
         </div>
       </div>
 
       {/* Player list */}
       {data.players.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-16 text-gray-400">
           <div className="text-5xl mb-4">👤</div>
-          <p>Noch keine Spieler angelegt.</p>
+          <p className="font-medium">Noch keine Spieler angelegt.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {data.players.map((player) => {
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          {data.players.map((player, idx) => {
             const isEditing = editingId === player.id;
             const sessions = sessionCount(player.id);
             const chritz = totalChritz(player.id);
 
             return (
-              <div key={player.id} className="bg-white rounded-xl border border-gray-200 p-4">
+              <div
+                key={player.id}
+                className={`px-4 py-3.5 ${idx < data.players.length - 1 ? 'border-b border-gray-100' : ''}`}
+              >
                 {isEditing ? (
                   <div className="flex gap-2">
                     <input
@@ -97,17 +102,17 @@ export default function Players() {
                         if (e.key === 'Escape') setEditingId(null);
                       }}
                       autoFocus
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="flex-1 bg-gray-100 rounded-xl px-4 py-2.5 text-base outline-none focus:bg-gray-200 transition-colors"
                     />
                     <button
                       onClick={() => handleUpdate(player.id)}
-                      className="bg-green-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-green-800 transition-colors"
+                      className="bg-green-700 text-white px-4 py-2.5 rounded-xl font-semibold active:bg-green-800"
                     >
                       ✓
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="border border-gray-300 text-gray-600 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                      className="bg-gray-100 text-gray-500 px-4 py-2.5 rounded-xl active:bg-gray-200"
                     >
                       ✗
                     </button>
@@ -117,7 +122,7 @@ export default function Players() {
                     <div className="min-w-0">
                       <button
                         onClick={() => navigate(`/spieler/${player.id}`)}
-                        className="font-semibold text-gray-800 hover:text-green-700 transition-colors truncate"
+                        className="font-semibold text-gray-900 active:text-green-700 transition-colors truncate block"
                       >
                         {player.name}
                       </button>
@@ -125,39 +130,39 @@ export default function Players() {
                         {sessions} Abende · {chritz} Chritz
                       </p>
                     </div>
-                    <div className="flex gap-1.5 items-center flex-shrink-0">
+                    <div className="flex gap-2 items-center flex-shrink-0">
                       {deleteConfirmId === player.id ? (
                         <>
                           <button
                             onClick={() => handleDelete(player.id)}
-                            className="text-xs px-3 py-2 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
+                            className="text-xs px-3 py-2 rounded-xl bg-red-500 text-white font-semibold active:bg-red-600"
                           >
                             Löschen
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(null)}
-                            className="text-xs px-3 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                            className="text-xs px-3 py-2 rounded-xl bg-gray-100 text-gray-600 active:bg-gray-200"
                           >
-                            Abb.
+                            Abbrechen
                           </button>
                         </>
                       ) : (
                         <>
                           <button
                             onClick={() => navigate(`/spieler/${player.id}`)}
-                            className="text-xs px-2.5 py-2 rounded-lg border border-gray-300 text-gray-600 hover:border-green-400 transition-colors"
+                            className="text-xs px-3 py-2 rounded-xl bg-gray-100 text-gray-600 active:bg-gray-200 font-medium"
                           >
                             Profil →
                           </button>
                           <button
                             onClick={() => { setEditingId(player.id); setEditName(player.name); }}
-                            className="text-xs px-2.5 py-2 rounded-lg border border-gray-300 text-gray-600 hover:border-gray-400 transition-colors"
+                            className="text-xs px-3 py-2 rounded-xl bg-gray-100 text-gray-600 active:bg-gray-200"
                           >
                             ✏️
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(player.id)}
-                            className="text-xs px-2.5 py-2 rounded-lg border border-red-200 text-red-400 hover:border-red-400 transition-colors"
+                            className="text-xs px-3 py-2 rounded-xl bg-red-50 text-red-400 active:bg-red-100"
                           >
                             🗑️
                           </button>
@@ -172,7 +177,6 @@ export default function Players() {
         </div>
       )}
 
-      {/* Export / Import section */}
       <ExportImport />
     </div>
   );
@@ -203,17 +207,17 @@ function ExportImport() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-gray-500">Daten Export / Import</h3>
+    <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+      <p className="text-xs font-semibold text-gray-500 tracking-wide">DATEN</p>
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={async () => { const { exportData } = await import('../store'); exportData(data); }}
-          className="text-sm px-4 py-2 bg-green-700 text-white rounded-lg font-medium hover:bg-green-800 transition-colors"
+          className="text-sm px-4 py-2.5 bg-green-700 text-white rounded-xl font-semibold active:bg-green-800 transition-colors"
         >
-          📤 Exportieren
+          Exportieren
         </button>
-        <label className={`text-sm px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:border-green-400 transition-colors cursor-pointer ${importing ? 'opacity-50' : ''}`}>
-          📥 Importieren
+        <label className={`text-sm px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold active:bg-gray-200 transition-colors cursor-pointer ${importing ? 'opacity-50' : ''}`}>
+          Importieren
           <input
             type="file"
             accept=".json"
@@ -225,7 +229,7 @@ function ExportImport() {
       </div>
       {importError && <p className="text-sm text-red-500">{importError}</p>}
       <p className="text-xs text-gray-400">
-        Daten werden lokal in deinem Browser gespeichert. Exportiere regelmässig als Backup.
+        Daten werden lokal gespeichert. Exportiere regelmässig als Backup.
       </p>
     </div>
   );
