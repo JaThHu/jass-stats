@@ -4,8 +4,24 @@
 
 /* iOS safe-area support */
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: max(env(safe-area-inset-bottom), 4px);
 }
 .pt-safe {
   padding-top: env(safe-area-inset-top);
+}
+
+/* System font & iOS background */
+body {
+  background-color: #f2f2f7;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }

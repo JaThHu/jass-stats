@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
 
 // ===== Types =====
@@ -7,6 +7,7 @@ interface SideState {
   s50: number;
   s20: number;
   rest: number | null;
+  weisTotal: number;
 }
 
 interface GameState {
@@ -14,11 +15,69 @@ interface GameState {
   B: SideState;
 }
 
+interface EntryModal {
+  open: boolean;
+  side: 'A' | 'B';
+  points: string;
+  multiplier: 1 | 2 | 3;
+  type: 'normal' | 'weis';
+  isMatch: boolean;
+}
+
+const ENTRY_DEFAULT: EntryModal = {
+  open: false, side: 'A', points: '', multiplier: 1, type: 'normal', isMatch: false,
+};
+
 // ===== Helpers =====
-const fresh = (): SideState => ({ s100: 0, s50: 0, s20: 0, rest: null });
+const fresh = (): SideState => ({ s100: 0, s50: 0, s20: 0, rest: null, weisTotal: 0 });
 
 function sideTotal(s: SideState): number {
   return s.s100 * 100 + s.s50 * 50 + s.s20 * 20 + (s.rest ?? 0);
+}
+
+function splitTotal(total: number): Pick<SideState, 's100' | 's50' | 's20' | 'rest'> {
+  const t = Math.max(0, Math.round(total));
+  const s100 = Math.floor(t / 100);
+  const r1 = t % 100;
+  const s50 = Math.floor(r1 / 50);
+  const r2 = r1 % 50;
+  const s20 = Math.floor(r2 / 20);
+  const rest = r2 % 20;
+  return { s100, s50, s20, rest: rest > 0 ? rest : null };
+}
+
+function addToSide(side: SideState, pts: number, weisAdd: number): SideState {
+  return { ...splitTotal(sideTotal(side) + pts), weisTotal: side.weisTotal + weisAdd };
+}
+
+function processEntry(
+  state: GameState,
+  entrySide: 'A' | 'B',
+  rawPoints: number,
+  mult: 1 | 2 | 3,
+  type: 'normal' | 'weis',
+  isMatch: boolean,
+): GameState {
+  const other: 'A' | 'B' = entrySide === 'A' ? 'B' : 'A';
+  let myPts: number;
+  let opponentPts: number;
+  let myWeisAdd = 0;
+
+  if (isMatch) {
+    myPts = 257 * mult;
+    opponentPts = 0;
+  } else if (type === 'weis') {
+    myPts = rawPoints * mult;
+    opponentPts = 0;
+    myWeisAdd = myPts;
+  } else {
+    myPts = rawPoints * mult;
+    opponentPts = Math.max(0, 157 * mult - myPts);
+  }
+
+  const newEntry = addToSide(state[entrySide], myPts, myWeisAdd);
+  const newOther = addToSide(state[other], opponentPts, 0);
+  return { A: entrySide === 'A' ? newEntry : newOther, B: entrySide === 'B' ? newEntry : newOther };
 }
 
 // ===== Tally Mark Components =====
@@ -26,29 +85,21 @@ function TallyMark({ style }: { style?: CSSProperties }) {
   return (
     <span style={{
       width: '2.5px', height: '20px',
-      background: 'rgba(240,235,220,0.88)',
+      background: 'rgba(15, 61, 32, 0.55)',
       borderRadius: '2px', display: 'inline-block',
-      boxShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-      flexShrink: 0,
-      ...style,
+      flexShrink: 0, ...style,
     }} />
   );
 }
 
 function TallyGroup5() {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      position: 'relative', gap: '2px', marginRight: '4px',
-    }}>
-      <TallyMark /><TallyMark /><TallyMark /><TallyMark /><TallyMark />
+    <span style={{ display: 'inline-flex', alignItems: 'center', position: 'relative', gap: '2px', marginRight: '4px' }}>
+      <TallyMark /><TallyMark /><TallyMark /><TallyMark />
       <span style={{
-        position: 'absolute',
-        width: 'calc(100% + 6px)', height: '2.5px',
-        background: 'rgba(240,235,220,0.88)',
-        top: '50%', left: '-3px',
-        transform: 'rotate(-68deg)', transformOrigin: 'center',
-        borderRadius: '2px', boxShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+        position: 'absolute', width: 'calc(100% + 6px)', height: '2px',
+        background: 'rgba(15, 61, 32, 0.55)', top: '50%', left: '-3px',
+        transform: 'rotate(-68deg)', transformOrigin: 'center', borderRadius: '2px',
       }} />
     </span>
   );
@@ -56,24 +107,18 @@ function TallyGroup5() {
 
 function TallyGroup2() {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center',
-      position: 'relative', gap: '2px', marginRight: '3px',
-    }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', position: 'relative', gap: '2px', marginRight: '3px' }}>
       <TallyMark /><TallyMark />
       <span style={{
-        position: 'absolute',
-        width: 'calc(100% + 4px)', height: '2.5px',
-        background: 'rgba(240,235,220,0.88)',
-        top: '50%', left: '-2px',
-        transform: 'rotate(-68deg)', transformOrigin: 'center',
-        borderRadius: '2px', boxShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+        position: 'absolute', width: 'calc(100% + 4px)', height: '2px',
+        background: 'rgba(15, 61, 32, 0.55)', top: '50%', left: '-2px',
+        transform: 'rotate(-68deg)', transformOrigin: 'center', borderRadius: '2px',
       }} />
     </span>
   );
 }
 
-function renderTally(count: number, type: '100' | '50' | '20') {
+function renderTally(count: number, type: '100' | '50' | '20'): ReactElement[] {
   const items: ReactElement[] = [];
   if (type === '50') {
     const pairs = Math.floor(count / 2), single = count % 2;
@@ -87,75 +132,34 @@ function renderTally(count: number, type: '100' | '50' | '20') {
   return items;
 }
 
-// ===== Z Shape (decorative chalk Z behind tally zones) =====
 function ZShape() {
   return (
-    <svg
-      style={{
-        position: 'absolute', inset: 0,
-        width: '100%', height: '100%',
-        pointerEvents: 'none', opacity: 0.08,
-      }}
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-    >
-      <line x1="4" y1="7" x2="96" y2="7"  stroke="white" strokeWidth="5" strokeLinecap="round" />
-      <line x1="96" y1="7" x2="4"  y2="93" stroke="white" strokeWidth="5" strokeLinecap="round" />
-      <line x1="4" y1="93" x2="96" y2="93" stroke="white" strokeWidth="5" strokeLinecap="round" />
+    <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.13 }}
+      viewBox="0 0 100 100" preserveAspectRatio="none">
+      <line x1="4"  y1="15"  x2="96" y2="15"  stroke="#0f3d20" strokeWidth="5" strokeLinecap="round" />
+      <line x1="96" y1="15"  x2="4"  y2="85"  stroke="#0f3d20" strokeWidth="5" strokeLinecap="round" />
+      <line x1="4"  y1="85"  x2="96" y2="85"  stroke="#0f3d20" strokeWidth="5" strokeLinecap="round" />
     </svg>
   );
 }
 
-// ===== Zone (tally area with tap / long-press) =====
+// ===== Zone (display only) =====
 interface ZoneProps {
   label: string;
   count: number;
   type: '100' | '50' | '20';
-  bg: string;
-  border: string;
-  onAdd: () => void;
-  onRemove: () => void;
 }
 
-function Zone({ label, count, type, bg, border, onAdd, onRemove }: ZoneProps) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const didLong = useRef(false);
-
-  const startLong = () => {
-    didLong.current = false;
-    timerRef.current = setTimeout(() => {
-      didLong.current = true;
-      onRemove();
-      navigator.vibrate?.(40);
-    }, 450);
-  };
-
-  const cancel = () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  const tap    = () => { if (!didLong.current) onAdd(); };
-
+function Zone({ label, count, type }: ZoneProps) {
   return (
-    <div
-      style={{
-        background: bg, border: `1px dashed ${border}`,
-        borderRadius: '3px', position: 'relative',
-        cursor: 'pointer', userSelect: 'none',
-        WebkitTapHighlightColor: 'transparent',
-        display: 'flex', alignItems: 'center',
-        flexWrap: 'wrap', gap: '2px',
-        padding: '5px 4px 5px 6px', minHeight: '42px',
-      }}
-      onTouchStart={e => { e.preventDefault(); startLong(); }}
-      onTouchEnd={e => { e.preventDefault(); cancel(); tap(); }}
-      onTouchCancel={cancel}
-      onMouseDown={startLong}
-      onMouseUp={() => { cancel(); tap(); }}
-      onMouseLeave={cancel}
-    >
+    <div style={{
+      position: 'relative',
+      display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '2px',
+      padding: '8px 6px 8px 8px', minHeight: '52px',
+    }}>
       <span style={{
-        position: 'absolute', top: '2px', left: '4px',
-        fontSize: '0.5rem', color: 'rgba(255,255,255,0.3)',
-        fontFamily: "'Patrick Hand', cursive",
-        pointerEvents: 'none', lineHeight: 1,
+        position: 'absolute', top: '4px', left: '6px',
+        fontSize: '9px', fontWeight: 600, color: 'rgba(15, 61, 32, 0.35)', lineHeight: 1,
       }}>{label}</span>
       {renderTally(count, type)}
     </div>
@@ -166,178 +170,161 @@ function Zone({ label, count, type, bg, border, onAdd, onRemove }: ZoneProps) {
 interface BoardSideProps {
   name: string;
   sideState: SideState;
-  side: 'A' | 'B';
   rotated?: boolean;
-  onChange: (side: 'A' | 'B', field: 's100' | 's50' | 's20', delta: 1 | -1) => void;
-  onOpenRest: (side: 'A' | 'B') => void;
   onNameChange: (name: string) => void;
+  onOpenEntry: () => void;
 }
 
-function BoardSide({ name, sideState, side, rotated, onChange, onOpenRest, onNameChange }: BoardSideProps) {
+function BoardSide({ name, sideState, rotated, onNameChange, onOpenEntry }: BoardSideProps) {
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column',
-      padding: '8px 10px 8px',
-      gap: '5px',
-      transform: rotated ? 'rotate(180deg)' : undefined,
-    }}>
-      {/* Player name input */}
-      <input
-        value={name}
-        onChange={e => onNameChange(e.target.value)}
-        maxLength={16}
-        style={{
-          fontFamily: "'Permanent Marker', cursive",
-          color: 'rgba(255,255,255,0.85)',
-          fontSize: 'clamp(0.85rem, 3vw, 1.05rem)',
-          textAlign: 'center', letterSpacing: '1px',
-          background: 'transparent',
-          border: 'none',
-          borderBottom: '1px dashed rgba(255,255,255,0.2)',
-          outline: 'none',
-          width: '100%',
-          padding: '2px 4px',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      />
-
-      {/* Tally zones with Z overlay */}
-      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        <ZShape />
-        <Zone
-          label="100er" count={sideState.s100} type="100"
-          bg="rgba(66,133,244,0.18)" border="rgba(66,133,244,0.4)"
-          onAdd={() => onChange(side, 's100', 1)}
-          onRemove={() => onChange(side, 's100', -1)}
+    <div className="p-4 space-y-2" style={{ transform: rotated ? 'rotate(180deg)' : undefined }}>
+      <div className="flex gap-2">
+        <input
+          value={name}
+          onChange={e => onNameChange(e.target.value)}
+          maxLength={16}
+          className="flex-1 min-w-0 bg-gray-100 rounded-xl px-4 py-2.5 text-center text-base font-semibold text-gray-900 outline-none focus:bg-gray-200 transition-colors"
         />
-        <Zone
-          label="50er" count={sideState.s50} type="50"
-          bg="rgba(52,168,83,0.18)" border="rgba(52,168,83,0.4)"
-          onAdd={() => onChange(side, 's50', 1)}
-          onRemove={() => onChange(side, 's50', -1)}
-        />
-        <Zone
-          label="20er" count={sideState.s20} type="20"
-          bg="rgba(251,188,5,0.18)" border="rgba(251,188,5,0.4)"
-          onAdd={() => onChange(side, 's20', 1)}
-          onRemove={() => onChange(side, 's20', -1)}
-        />
+        <button
+          onClick={onOpenEntry}
+          className="bg-green-700 text-white rounded-xl px-4 py-2.5 font-semibold text-xl active:bg-green-800 transition-colors flex-shrink-0"
+        >➕</button>
       </div>
-
-      {/* Rest + Total row */}
-      <div style={{ display: 'flex', gap: '5px', alignItems: 'stretch' }}>
-        {/* Rest zone */}
+      <div className="relative space-y-2">
+        <ZShape />
+        <Zone label="100er" count={sideState.s100} type="100" />
+        <Zone label="50er"  count={sideState.s50}  type="50" />
+        <Zone label="20er"  count={sideState.s20}  type="20" />
+      </div>
+      <div className="flex gap-2">
         <div
-          style={{
-            flex: 1,
-            background: 'rgba(234,67,53,0.15)',
-            border: '1px dashed rgba(234,67,53,0.4)',
-            borderRadius: '3px', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            minHeight: '40px', position: 'relative',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          onClick={() => onOpenRest(side)}
+          className="bg-red-50 rounded-xl flex items-center justify-center min-h-[48px] relative"
+          style={{ border: '1px dashed rgba(239,68,68,0.25)', width: '56px', flexShrink: 0 }}
         >
-          <span style={{
-            position: 'absolute', top: '2px', left: '4px',
-            fontSize: '0.5rem', color: 'rgba(255,150,130,0.35)',
-            fontFamily: "'Patrick Hand', cursive",
-            pointerEvents: 'none', lineHeight: 1,
-          }}>Rest</span>
-          <span style={{
-            fontFamily: "'Permanent Marker', cursive",
-            color: 'rgba(255,180,160,0.95)',
-            fontSize: 'clamp(1.1rem, 4vw, 1.5rem)',
-            textShadow: '0 0 8px rgba(234,67,53,0.4)',
-          }}>
+          <span className="absolute top-1.5 left-2 text-[9px] font-semibold text-red-300">Rest</span>
+          <span className="text-base font-bold text-red-400">
             {sideState.rest !== null ? sideState.rest : ''}
           </span>
         </div>
-
-        {/* Total */}
-        <div style={{
-          background: 'rgba(0,0,0,0.35)',
-          borderRadius: '3px', textAlign: 'center',
-          padding: '5px 10px',
-          fontFamily: "'Permanent Marker', cursive",
-          color: 'rgba(255,255,255,0.9)',
-          fontSize: 'clamp(1.0rem, 3.5vw, 1.3rem)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          minWidth: '80px',
-        }}>
-          = {sideTotal(sideState)}
+        <div className="flex-1 bg-green-700 text-white rounded-xl flex flex-col items-center justify-center px-3 py-2 min-h-[48px]">
+          <span className="text-3xl font-bold leading-tight">{sideTotal(sideState)}</span>
+          {sideState.weisTotal > 0 && (
+            <span className="text-[10px] text-green-200 font-medium leading-tight mt-0.5">
+              Weis: {sideState.weisTotal}
+            </span>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ===== Persistence helpers =====
+// ===== Score Divider =====
+function ScoreDivider({ stateA, stateB, names }: {
+  stateA: SideState; stateB: SideState; names: { A: string; B: string };
+}) {
+  const totalA = sideTotal(stateA);
+  const totalB = sideTotal(stateB);
+  const diff = totalA - totalB;
+
+  let label: string;
+  if (diff === 0 && totalA === 0) label = '🃏 Jass-Stats';
+  else if (diff === 0)            label = 'Gleich';
+  else if (diff > 0)              label = `${names.A}  +${diff}`;
+  else                            label = `${names.B}  +${Math.abs(diff)}`;
+
+  return (
+    <div className="flex items-center gap-3 bg-green-700 px-4 py-2.5">
+      <div className="flex-1 h-px bg-white/20" />
+      <span className="text-xs font-semibold text-white/90 whitespace-nowrap">{label}</span>
+      <div className="flex-1 h-px bg-white/20" />
+    </div>
+  );
+}
+
+// ===== Numpad =====
+function Numpad({ onDigit, onBackspace }: { onDigit: (d: number) => void; onBackspace: () => void }) {
+  const btnCls = 'bg-gray-100 text-gray-800 rounded-xl py-3.5 font-semibold text-lg active:bg-gray-200 transition-colors';
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+        <button key={n} className={btnCls} onClick={() => onDigit(n)}>{n}</button>
+      ))}
+      <button className={`${btnCls} col-span-2`} onClick={() => onDigit(0)}>0</button>
+      <button className="bg-gray-100 text-red-400 rounded-xl py-3.5 font-semibold active:bg-gray-200 transition-colors" onClick={onBackspace}>⌫</button>
+    </div>
+  );
+}
+
+// ===== Persistence =====
 const STORAGE_KEY = 'jasstafel-v1';
 
 function loadFromStorage(): { state: GameState; names: { A: string; B: string } } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Migration: add weisTotal if missing from old data
+      if (parsed.state?.A) parsed.state.A.weisTotal ??= 0;
+      if (parsed.state?.B) parsed.state.B.weisTotal ??= 0;
+      return parsed;
+    }
   } catch { /* ignore */ }
   return { state: { A: fresh(), B: fresh() }, names: { A: 'Team 1', B: 'Team 2' } };
 }
 
 function saveToStorage(state: GameState, names: { A: string; B: string }) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, names }));
-  } catch { /* ignore */ }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ state, names })); } catch { /* ignore */ }
 }
 
 // ===== Main Page =====
 export default function Tafel() {
-  const [state, setState] = useState<GameState>(() => loadFromStorage().state);
-  const [hist, setHist] = useState<GameState[]>([]);
-  const [names, setNames] = useState(() => loadFromStorage().names);
-  const [restModal, setRestModal] = useState<{ open: boolean; side: 'A' | 'B' }>({ open: false, side: 'A' });
-  const [restVal, setRestVal] = useState('');
+  const [state, setState]   = useState<GameState>(() => loadFromStorage().state);
+  const [hist, setHist]     = useState<GameState[]>([]);
+  const [names, setNames]   = useState(() => loadFromStorage().names);
+  const [entry, setEntry]   = useState<EntryModal>(ENTRY_DEFAULT);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const restInputRef = useRef<HTMLInputElement>(null);
 
-  // Persist on every change
   useEffect(() => { saveToStorage(state, names); }, [state, names]);
 
   const pushHist = (s: GameState) =>
     setHist(prev => [...prev, JSON.parse(JSON.stringify(s))].slice(-60));
 
-  const change = (side: 'A' | 'B', field: 's100' | 's50' | 's20', delta: 1 | -1) => {
-    pushHist(state);
-    setState(prev => ({
-      ...prev,
-      [side]: { ...prev[side], [field]: Math.max(0, prev[side][field] + delta) },
-    }));
+  // Round entry
+  const openEntry = (side: 'A' | 'B') =>
+    setEntry({ ...ENTRY_DEFAULT, open: true, side });
+
+  const appendDigit = (d: number) => {
+    setEntry(e => {
+      if (e.points.length >= 3) return e;
+      if (e.points === '0') return { ...e, points: d === 0 ? '0' : `${d}` };
+      return { ...e, points: e.points + d };
+    });
   };
 
-  const openRest = (side: 'A' | 'B') => {
+  const commitEntry = () => {
+    const rawPoints = parseInt(entry.points, 10) || 0;
+    if (!entry.isMatch && rawPoints < 0) return;
     pushHist(state);
-    setRestVal('');
-    setRestModal({ open: true, side });
-    setTimeout(() => restInputRef.current?.focus(), 120);
+    setState(prev => processEntry(prev, entry.side, rawPoints, entry.multiplier, entry.type, entry.isMatch));
+    setEntry(ENTRY_DEFAULT);
   };
 
-  const commitRest = () => {
-    const v = parseInt(restVal, 10);
-    if (isNaN(v)) return;
-    setState(prev => ({
-      ...prev,
-      [restModal.side]: {
-        ...prev[restModal.side],
-        rest: (prev[restModal.side].rest ?? 0) + v,
-      },
-    }));
-    setRestModal(m => ({ ...m, open: false }));
-  };
+  // Preview calculations
+  const rawPts = parseInt(entry.points, 10) || 0;
+  const previewMyPts  = entry.isMatch ? 257 * entry.multiplier : rawPts * entry.multiplier;
+  const previewOppPts = entry.isMatch || entry.type === 'weis'
+    ? 0
+    : Math.max(0, 157 * entry.multiplier - rawPts * entry.multiplier);
+  const myName  = entry.side === 'A' ? names.A : names.B;
+  const oppName = entry.side === 'A' ? names.B : names.A;
+  const canCommit = entry.isMatch || entry.points !== '';
 
   const undo = () => {
     if (!hist.length) return;
     setState(hist[hist.length - 1]);
     setHist(prev => prev.slice(0, -1));
+    navigator.vibrate?.(20);
   };
 
   const resetAll = () => {
@@ -349,7 +336,7 @@ export default function Tafel() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setRestModal(m => ({ ...m, open: false }));
+        setEntry(ENTRY_DEFAULT);
         setConfirmOpen(false);
       }
     };
@@ -357,228 +344,226 @@ export default function Tafel() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // App green palette
-  const G = {
-    outerBg:    '#0f3d20',
-    frameBg:    'linear-gradient(135deg, #14532d, #166534, #14532d)',
-    boardBg:    '#0b2918',
-    divider:    'rgba(255,255,255,0.55)',
-    btnUndo:    '#166534',
-    btnReset:   '#7f1d1d',
-    modalBg:    '#0d2818',
-  };
-
-  const btnBase: CSSProperties = {
-    flex: 1, padding: '10px 8px',
-    fontFamily: "'Permanent Marker', cursive",
-    fontSize: 'clamp(0.75rem, 2.5vw, 0.95rem)',
-    border: '2px solid rgba(255,255,255,0.15)',
-    borderRadius: '6px', cursor: 'pointer',
-    letterSpacing: '0.5px', color: '#e8f5e9',
-  };
+  const hasWeis = state.A.weisTotal > 0 || state.B.weisTotal > 0;
 
   return (
-    <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Patrick+Hand&display=swap');`}</style>
+    <div className="space-y-4">
 
-      {/* Full-bleed green background */}
-      <div style={{
-        margin: '-1.5rem -1rem 0',
-        backgroundImage: `
-          repeating-linear-gradient(90deg, rgba(0,0,0,0.07) 0px, rgba(0,0,0,0.07) 2px, transparent 2px, transparent 40px),
-          repeating-linear-gradient(0deg, rgba(0,0,0,0.07) 0px, rgba(0,0,0,0.07) 2px, transparent 2px, transparent 40px)
-        `,
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        padding: '12px', paddingBottom: '80px', gap: '10px',
-        minHeight: 'calc(100dvh - 60px)',
-      }}>
-
-        {/* Board frame */}
-        <div style={{
-          background: G.frameBg,
-          borderRadius: '8px', padding: '12px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.08)',
-          width: '100%', maxWidth: '480px',
-        }}>
-          {/* Chalkboard — vertical layout */}
-          <div style={{
-            background: G.boardBg,
-            backgroundImage: 'radial-gradient(ellipse at 50% 20%, rgba(255,255,255,0.02) 0%, transparent 60%)',
-            borderRadius: '4px',
-            display: 'flex', flexDirection: 'column',
-            position: 'relative', overflow: 'hidden',
-          }}>
-            {/* Side B — Dir (top, rotated 180° for opposite player) */}
-            <BoardSide
-              name={names.B} sideState={state.B} side="B" rotated
-              onChange={change} onOpenRest={openRest}
-              onNameChange={n => setNames(prev => ({ ...prev, B: n }))}
-            />
-
-            {/* Horizontal divider */}
-            <div style={{
-              height: '3px',
-              background: G.divider,
-              margin: '0 0',
-            }} />
-
-            {/* Side A — Mir (bottom, normal) */}
-            <BoardSide
-              name={names.A} sideState={state.A} side="A"
-              onChange={change} onOpenRest={openRest}
-              onNameChange={n => setNames(prev => ({ ...prev, A: n }))}
-            />
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div style={{ display: 'flex', gap: '8px', width: '100%', maxWidth: '480px' }}>
-          <button style={{ ...btnBase, background: G.btnUndo }}  onClick={undo}>
-            ↩ Rückgängig
-          </button>
-          <button style={{ ...btnBase, background: G.btnReset }} onClick={() => setConfirmOpen(true)}>
-            🗑 Alles löschen
-          </button>
-        </div>
+      {/* ── Board ── */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <BoardSide
+          name={names.B} sideState={state.B} rotated
+          onNameChange={n => setNames(prev => ({ ...prev, B: n }))}
+          onOpenEntry={() => openEntry('B')}
+        />
+        <ScoreDivider stateA={state.A} stateB={state.B} names={names} />
+        <BoardSide
+          name={names.A} sideState={state.A}
+          onNameChange={n => setNames(prev => ({ ...prev, A: n }))}
+          onOpenEntry={() => openEntry('A')}
+        />
       </div>
 
-      {/* Rest Modal */}
-      {restModal.open && (
-        <div
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.72)', zIndex: 50,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          onClick={() => setRestModal(m => ({ ...m, open: false }))}
+      {/* ── Action buttons ── */}
+      <div className="flex gap-3">
+        <button
+          onClick={undo}
+          disabled={hist.length === 0}
+          className="flex-1 bg-green-700 text-white rounded-2xl py-4 font-semibold text-base disabled:opacity-40 active:bg-green-800 transition-colors"
         >
-          <div
-            style={{
-              background: G.modalBg,
-              border: '2px solid rgba(255,255,255,0.15)',
-              borderRadius: '10px', padding: '18px',
-              width: 'min(310px, 93vw)',
-              display: 'flex', flexDirection: 'column', gap: '12px',
-              boxShadow: '0 16px 48px rgba(0,0,0,0.8)',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <h2 style={{
-              fontFamily: "'Permanent Marker', cursive",
-              color: '#e8f5e9', fontSize: '1.05rem', textAlign: 'center',
-            }}>
-              {restModal.side === 'A' ? names.A : names.B} – Restzahl
-            </h2>
-            <div style={{
-              background: 'rgba(255,255,255,0.05)',
-              borderRadius: '6px', padding: '7px 10px',
-              fontFamily: "'Patrick Hand', cursive",
-              color: 'rgba(255,255,255,0.5)',
-              fontSize: '0.8rem', lineHeight: 1.4,
-            }}>
-              Positiv (z.B. 9) oder negativ (z.B. -4). Wird zur bestehenden Restzahl addiert.
-            </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                style={{
-                  padding: '10px 12px',
-                  fontFamily: "'Permanent Marker', cursive",
-                  fontSize: '1.1rem', border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '6px', cursor: 'pointer',
-                  color: '#e8f5e9', background: 'rgba(255,255,255,0.07)',
-                  minWidth: '42px',
-                }}
-                onClick={() => setRestVal(v => v.startsWith('-') ? v.slice(1) : '-' + (v || '0'))}
-              >±</button>
-              <input
-                ref={restInputRef}
-                type="text" inputMode="numeric"
-                value={restVal}
-                onChange={e => {
-                  const val = e.target.value;
-                  if (/^-?\d*$/.test(val)) setRestVal(val);
-                }}
-                onKeyDown={e => e.key === 'Enter' && commitRest()}
-                placeholder="z.B. 9 oder -4"
-                style={{
-                  flex: 1,
-                  background: 'rgba(255,255,255,0.07)',
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  borderRadius: '6px', color: '#e8f5e9',
-                  fontFamily: "'Permanent Marker', cursive",
-                  fontSize: '1.2rem', padding: '8px 10px',
-                  textAlign: 'center', outline: 'none',
-                }}
-              />
-              <button
-                style={{
-                  padding: '10px 14px',
-                  fontFamily: "'Permanent Marker', cursive",
-                  fontSize: '0.9rem', border: 'none',
-                  borderRadius: '6px', cursor: 'pointer',
-                  color: 'white', background: '#166534',
-                }}
-                onClick={commitRest}
-              >✓</button>
-            </div>
-            <div
-              style={{
-                background: 'rgba(80,80,80,0.35)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '6px', color: 'rgba(255,255,255,0.45)',
-                fontFamily: "'Patrick Hand', cursive",
-                fontSize: '0.9rem', padding: '8px',
-                cursor: 'pointer', textAlign: 'center',
-              }}
-              onClick={() => setRestModal(m => ({ ...m, open: false }))}
-            >Abbrechen</div>
+          ↩ Rückgängig
+        </button>
+        <button
+          onClick={() => setConfirmOpen(true)}
+          className="bg-gray-100 text-red-400 rounded-2xl py-4 px-6 font-semibold text-base active:bg-gray-200 transition-colors"
+        >
+          🗑 Reset
+        </button>
+      </div>
+
+      {/* ── Weis-Übersicht ── */}
+      {hasWeis && (
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <p className="text-xs font-semibold text-gray-500 tracking-wide mb-3">WEIS-ÜBERSICHT</p>
+          <div className="grid grid-cols-2 gap-3">
+            {(['A', 'B'] as const).map(side => (
+              <div key={side} className="text-center">
+                <p className="text-xs text-gray-500 font-medium mb-1 truncate">
+                  {side === 'A' ? names.A : names.B}
+                </p>
+                <p className="text-2xl font-bold text-purple-600">{state[side].weisTotal}</p>
+                <p className="text-xs text-gray-400">Weis-Punkte</p>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Confirm Reset */}
-      {confirmOpen && (
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.7)', zIndex: 100,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{
-            background: G.modalBg,
-            border: '2px solid rgba(255,255,255,0.15)',
-            borderRadius: '10px', padding: '22px', textAlign: 'center',
-            display: 'flex', flexDirection: 'column', gap: '14px',
-            width: 'min(270px, 90vw)',
-          }}>
-            <p style={{ fontFamily: "'Permanent Marker', cursive", color: '#e8f5e9', fontSize: '1.05rem' }}>
-              Tafel wirklich löschen?
-            </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
+      {/* ══════════════════════════════════════
+           RUNDE-EINGABE BOTTOM SHEET
+          ══════════════════════════════════════ */}
+      {entry.open && (
+        <div
+          className="fixed inset-0 bg-black/40 z-[60] flex items-end"
+          onClick={() => setEntry(ENTRY_DEFAULT)}
+        >
+          <div
+            className="bg-white rounded-t-3xl w-full max-w-lg mx-auto pb-safe overflow-y-auto max-h-[92vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Drag handle */}
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-4" />
+
+            <div className="px-5 space-y-4 pb-6">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-900">Runde — {myName}</h3>
+                <button
+                  onClick={() => setEntry(ENTRY_DEFAULT)}
+                  className="text-gray-400 text-2xl leading-none active:text-gray-600"
+                >×</button>
+              </div>
+
+              {/* Match Toggle */}
               <button
-                style={{
-                  flex: 1, padding: '10px',
-                  fontFamily: "'Permanent Marker', cursive",
-                  border: 'none', borderRadius: '6px',
-                  cursor: 'pointer', fontSize: '0.95rem',
-                  background: 'rgba(100,100,100,0.4)', color: '#ccc',
-                }}
-                onClick={() => setConfirmOpen(false)}
-              >Nein</button>
-              <button
-                style={{
-                  flex: 1, padding: '10px',
-                  fontFamily: "'Permanent Marker', cursive",
-                  border: 'none', borderRadius: '6px',
-                  cursor: 'pointer', fontSize: '0.95rem',
-                  background: '#7f1d1d', color: 'white',
-                }}
-                onClick={resetAll}
-              >Ja</button>
+                onClick={() => setEntry(e => ({ ...e, isMatch: !e.isMatch, points: '' }))}
+                className={`w-full py-3.5 rounded-2xl font-semibold text-base transition-colors ${
+                  entry.isMatch
+                    ? 'bg-amber-500 text-white active:bg-amber-600'
+                    : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+                }`}
+              >
+                {entry.isMatch ? '⚡ Match — 257 Punkte' : '⚡ Match'}
+              </button>
+
+              {/* Points input — hidden when Match */}
+              {!entry.isMatch && (
+                <>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 tracking-wide mb-2">MEINE PUNKTE</p>
+                    <div className="bg-gray-100 rounded-xl px-4 py-3 text-3xl font-bold text-center text-gray-900 min-h-[60px] flex items-center justify-center">
+                      {entry.points !== ''
+                        ? entry.points
+                        : <span className="text-gray-300 text-2xl">0</span>
+                      }
+                    </div>
+                  </div>
+                  <Numpad
+                    onDigit={appendDigit}
+                    onBackspace={() => setEntry(e => ({ ...e, points: e.points.slice(0, -1) }))}
+                  />
+                </>
+              )}
+
+              {/* Multiplier */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 tracking-wide mb-2">MULTIPLIKATOR</p>
+                <div className="flex gap-2">
+                  {([1, 2, 3] as const).map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setEntry(e => ({ ...e, multiplier: m }))}
+                      className={`flex-1 py-3 rounded-xl font-bold text-base transition-colors ${
+                        entry.multiplier === m
+                          ? 'bg-green-700 text-white'
+                          : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+                      }`}
+                    >{m}×</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Type: Normal / Weis — hidden for Match */}
+              {!entry.isMatch && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 tracking-wide mb-2">ART</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setEntry(e => ({ ...e, type: 'normal' }))}
+                      className={`flex-1 py-3 rounded-xl font-semibold transition-colors ${
+                        entry.type === 'normal'
+                          ? 'bg-green-700 text-white'
+                          : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+                      }`}
+                    >Normal</button>
+                    <button
+                      onClick={() => setEntry(e => ({ ...e, type: 'weis' }))}
+                      className={`flex-1 py-3 rounded-xl font-semibold transition-colors ${
+                        entry.type === 'weis'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+                      }`}
+                    >Weis</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview */}
+              <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">{myName} erhält</span>
+                  <span className="font-bold text-gray-900 text-base">
+                    {previewMyPts} Pkt
+                    {entry.type === 'weis' && !entry.isMatch && (
+                      <span className="text-xs text-purple-500 font-semibold ml-1.5">(Weis)</span>
+                    )}
+                    {entry.isMatch && (
+                      <span className="text-xs text-amber-500 font-semibold ml-1.5">(Match)</span>
+                    )}
+                  </span>
+                </div>
+                <div className="h-px bg-gray-200" />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">{oppName} erhält</span>
+                  <span className={`font-bold text-base ${previewOppPts === 0 ? 'text-gray-300' : 'text-gray-900'}`}>
+                    {previewOppPts} Pkt
+                    {previewOppPts === 0 && (entry.isMatch || entry.type === 'weis') && (
+                      <span className="text-xs text-gray-400 font-normal ml-1.5">
+                        {entry.isMatch ? '(Match)' : '(Weis)'}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Confirm / Cancel */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setEntry(ENTRY_DEFAULT)}
+                  className="flex-1 bg-gray-100 text-gray-600 rounded-2xl py-4 font-semibold active:bg-gray-200 transition-colors"
+                >Abbrechen</button>
+                <button
+                  onClick={commitEntry}
+                  disabled={!canCommit}
+                  className="flex-[2] bg-green-700 text-white rounded-2xl py-4 font-semibold disabled:opacity-40 active:bg-green-800 transition-colors"
+                >Eintragen</button>
+              </div>
             </div>
           </div>
         </div>
       )}
-    </>
+
+      {/* ══════════════════════════════════════
+           RESET BESTÄTIGUNG
+          ══════════════════════════════════════ */}
+      {confirmOpen && (
+        <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center px-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-xs shadow-xl space-y-5">
+            <p className="text-lg font-bold text-gray-900 text-center">Tafel wirklich löschen?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="flex-1 bg-gray-100 text-gray-700 rounded-2xl py-3.5 font-semibold active:bg-gray-200"
+              >Nein</button>
+              <button
+                onClick={resetAll}
+                className="flex-1 bg-red-500 text-white rounded-2xl py-3.5 font-semibold active:bg-red-600"
+              >Ja, löschen</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
   );
 }
