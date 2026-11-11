@@ -27,6 +27,7 @@ export default {
         team0: '#3987e5',
         team1: '#d95926',
         danger: '#ef5b5b',
+        weis: '#9085e9',
         wolf: '#e0262a',
         chalk: '#1a2420',
       },

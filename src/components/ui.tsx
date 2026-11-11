@@ -29,7 +29,7 @@ export function PageHeader({ title, subtitle, right }: { title: ReactNode; subti
   );
 }
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'weis';
 
 const variants: Record<Variant, string> = {
   primary: 'bg-brand text-[#06140d] active:bg-brand-strong disabled:bg-surface-3 disabled:text-ink-3',
@@ -37,6 +37,7 @@ const variants: Record<Variant, string> = {
   ghost: 'bg-transparent text-ink-2 active:bg-surface-2',
   danger: 'bg-danger/15 text-danger active:bg-danger/25',
   gold: 'bg-gold text-[#1c1405] active:brightness-95',
+  weis: 'bg-weis text-white active:brightness-110 disabled:bg-surface-3 disabled:text-ink-3',
 };
 
 export function Button({

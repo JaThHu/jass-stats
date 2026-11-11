@@ -78,10 +78,12 @@ export interface BoardSideProps {
   bergpreisDone: boolean;
   disabled?: boolean;
   isWinner?: boolean;
+  /** Geschriebener Weis dieser Partie (inkl. Multiplikator). */
+  weis: number;
   onAdd: () => void;
 }
 
-export function BoardSide({ team, name, total, rotated, bergpreisDone, disabled, isWinner, onAdd }: BoardSideProps) {
+export function BoardSide({ team, name, total, rotated, bergpreisDone, disabled, isWinner, weis, onAdd }: BoardSideProps) {
   const split = splitTally(total);
   const color = TEAM_COLORS[team];
   const target = !bergpreisDone && total < BERGPREIS_POINTS ? BERGPREIS_POINTS : SIEG_POINTS;
@@ -149,7 +151,10 @@ export function BoardSide({ team, name, total, rotated, bergpreisDone, disabled,
             <span className="absolute right-0">2500</span>
           </div>
         </div>
-        <p className="text-[40px] font-bold leading-none text-ink tracking-tight min-w-[96px] text-right">{total}</p>
+        <div className="text-right min-w-[96px]">
+          {weis > 0 && <p className="text-[11px] font-semibold text-weis tabular mb-0.5">davon Weis {weis}</p>}
+          <p className="text-[40px] font-bold leading-none text-ink tracking-tight">{total}</p>
+        </div>
       </div>
     </div>
   );

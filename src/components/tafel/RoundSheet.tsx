@@ -1,52 +1,66 @@
 import { useEffect, useState } from 'react';
-import { Delete, Trash2, Zap, ChevronDown, X } from 'lucide-react';
-import { roundPoints } from '../../lib/scoring';
+import { Delete, Trash2, Zap } from 'lucide-react';
+import { isWeisOnly, roundPoints, weisPair } from '../../lib/scoring';
 import { MULTIPLIERS, STICH_TOTAL, type Round, type TeamIndex } from '../../lib/types';
 import type { RoundInput } from '../../lib/actions';
 import { Button, Segmented, Sheet, TeamDot } from '../ui';
 import { cx } from '../../lib/cx';
 
-const WEIS_STEPS = [20, 50, 100, 150, 200];
+type Mode = 'punkte' | 'weis';
 
 interface Draft {
+  mode: Mode;
   team: TeamIndex;
-  points: string;
+  value: string;
   match: boolean;
   multiplier: number;
-  weis: [number, number];
-  stoeck: [boolean, boolean];
-  showWeis: boolean;
 }
 
 function draftFrom(round: Round | null, team: TeamIndex, multiplier: number): Draft {
-  if (!round) {
-    return { team, points: '', match: false, multiplier, weis: [0, 0], stoeck: [false, false], showWeis: false };
+  if (!round) return { mode: 'punkte', team, value: '', match: false, multiplier };
+  if (isWeisOnly(round)) {
+    const w = weisPair(round);
+    const t: TeamIndex = w[1] > w[0] ? 1 : 0;
+    return { mode: 'weis', team: t, value: String(w[t]), match: false, multiplier: round.multiplier };
   }
   return {
+    mode: 'punkte',
     team: round.matchTeam ?? round.stichTeam ?? team,
-    points: round.stichPoints !== null && round.matchTeam === null ? String(round.stichPoints) : '',
+    value: round.matchTeam === null && round.stichPoints !== null ? String(round.stichPoints) : '',
     match: round.matchTeam !== null,
     multiplier: round.multiplier,
-    weis: [...round.weis],
-    stoeck: [...round.stoeck],
-    showWeis: round.weis[0] + round.weis[1] > 0 || round.stoeck[0] || round.stoeck[1],
   };
 }
 
-function toInput(d: Draft): RoundInput {
-  const hasStich = !d.match && d.points !== '';
+function toInput(d: Draft, base: Round | null): RoundInput {
+  const n = d.value === '' ? null : parseInt(d.value, 10);
+  if (d.mode === 'weis') {
+    const weis: [number, number] = [0, 0];
+    weis[d.team] = n ?? 0;
+    return {
+      multiplier: d.multiplier,
+      matchTeam: null,
+      stichTeam: null,
+      stichPoints: null,
+      weis,
+      stoeck: [false, false],
+    };
+  }
+  // Weis, der früher zusammen mit einer Runde erfasst wurde, bleibt beim Bearbeiten erhalten.
+  const keep = base && !isWeisOnly(base);
   return {
     multiplier: d.multiplier,
     matchTeam: d.match ? d.team : null,
-    stichTeam: hasStich ? d.team : null,
-    stichPoints: hasStich ? parseInt(d.points, 10) : null,
-    weis: d.weis,
-    stoeck: d.stoeck,
+    stichTeam: !d.match && n !== null ? d.team : null,
+    stichPoints: !d.match && n !== null ? n : null,
+    weis: keep ? base.weis : [0, 0],
+    stoeck: keep ? base.stoeck : [false, false],
   };
 }
 
 export function RoundSheet({
   names,
+  order,
   initialTeam,
   round,
   roundNumber,
@@ -56,6 +70,8 @@ export function RoundSheet({
   onClose,
 }: {
   names: [string, string];
+  /** Reihenfolge der Teams in der Auswahl (mein Team zuerst). */
+  order: [TeamIndex, TeamIndex];
   initialTeam: TeamIndex;
   round: Round | null;
   roundNumber: number;
@@ -67,21 +83,21 @@ export function RoundSheet({
   const [d, setD] = useState<Draft>(() => draftFrom(round, initialTeam, lastMultiplier));
   const set = (patch: Partial<Draft>) => setD((prev) => ({ ...prev, ...patch }));
 
-  const pts = d.points === '' ? null : parseInt(d.points, 10);
-  const tooMany = pts !== null && pts > STICH_TOTAL;
-  const weisSum = d.weis[0] + d.weis[1] + (d.stoeck[0] ? 20 : 0) + (d.stoeck[1] ? 20 : 0);
-  const valid = !tooMany && (d.match || pts !== null || weisSum > 0);
-  const input = toInput(d);
+  const isWeis = d.mode === 'weis';
+  const n = d.value === '' ? null : parseInt(d.value, 10);
+  const tooMany = !isWeis && n !== null && n > STICH_TOTAL;
+  const valid = isWeis ? n !== null && n > 0 : !tooMany && (d.match || n !== null);
+  const input = toInput(d, round);
   const preview = roundPoints(input);
-  const other: TeamIndex = d.team === 0 ? 1 : 0;
+  const typing = !d.match;
 
-  const digit = (n: number) =>
+  const digit = (k: number) =>
     setD((prev) => {
-      if (prev.match) return prev;
-      const next = prev.points === '0' ? String(n) : prev.points + n;
-      return next.length > 3 ? prev : { ...prev, points: next };
+      if (prev.mode === 'punkte' && prev.match) return prev;
+      const next = prev.value === '0' ? String(k) : prev.value + k;
+      return next.length > 3 ? prev : { ...prev, value: next };
     });
-  const back = () => setD((prev) => ({ ...prev, points: prev.points.slice(0, -1) }));
+  const back = () => setD((prev) => ({ ...prev, value: prev.value.slice(0, -1) }));
 
   const save = () => {
     if (!valid) return;
@@ -100,34 +116,26 @@ export function RoundSheet({
     return () => window.removeEventListener('keydown', h);
   });
 
-  const addWeis = (t: TeamIndex, v: number) =>
-    setD((prev) => {
-      const weis: [number, number] = [...prev.weis];
-      weis[t] += v;
-      return { ...prev, weis };
-    });
-  const clearWeis = (t: TeamIndex) =>
-    setD((prev) => {
-      const weis: [number, number] = [...prev.weis];
-      const stoeck: [boolean, boolean] = [...prev.stoeck];
-      weis[t] = 0;
-      stoeck[t] = false;
-      return { ...prev, weis, stoeck };
-    });
-  const toggleStoeck = (t: TeamIndex) =>
-    setD((prev) => {
-      const on = !prev.stoeck[t];
-      const stoeck: [boolean, boolean] = [false, false];
-      stoeck[t] = on;
-      return { ...prev, stoeck };
-    });
-
   const key =
-    'h-[50px] rounded-xl bg-surface-2 border border-line text-ink text-[22px] font-semibold active:bg-surface-3 transition-colors disabled:text-ink-3/40';
+    'h-[52px] rounded-xl bg-surface-2 border border-line text-ink text-[22px] font-semibold active:bg-surface-3 transition-colors disabled:text-ink-3/40';
+
+  let hint: React.ReactNode;
+  if (isWeis) hint = <>Weis</>;
+  else if (tooMany) hint = <span className="text-danger font-semibold">max. 157</span>;
+  else if (d.match) hint = <>Match</>;
+  else if (n !== null)
+    hint = (
+      <>
+        Gegner
+        <br />
+        <span className="text-base font-semibold text-ink-2 tabular">{STICH_TOTAL - n}</span>
+      </>
+    );
+  else hint = <>Stichpunkte</>;
 
   return (
     <Sheet
-      title={round ? `Runde ${roundNumber} bearbeiten` : `Runde ${roundNumber}`}
+      title={round ? `Runde ${roundNumber} bearbeiten` : isWeis ? 'Weis schreiben' : `Runde ${roundNumber}`}
       onClose={onClose}
       right={
         onDelete && (
@@ -138,16 +146,25 @@ export function RoundSheet({
       }
     >
       <div className="space-y-3.5">
+        <Segmented<Mode>
+          value={d.mode}
+          onChange={(mode) => set({ mode, value: '', match: false })}
+          options={[
+            { value: 'punkte', label: 'Punkte', activeClass: 'bg-brand text-[#06140d]' },
+            { value: 'weis', label: 'Weis', activeClass: 'bg-weis text-white' },
+          ]}
+        />
+
         <div>
-          <p className="text-xs font-medium text-ink-3 mb-1.5">Punkte von</p>
+          <p className="text-xs font-medium text-ink-3 mb-1.5">{isWeis ? 'Weis für' : 'Punkte von'}</p>
           <Segmented<TeamIndex>
             value={d.team}
             onChange={(team) => set({ team })}
-            options={[0, 1].map((t) => ({
-              value: t as TeamIndex,
+            options={order.map((t) => ({
+              value: t,
               label: (
                 <span className="inline-flex items-center gap-2 justify-center max-w-full">
-                  <TeamDot team={t as TeamIndex} />
+                  <TeamDot team={t} />
                   <span className="truncate">{names[t]}</span>
                 </span>
               ),
@@ -159,38 +176,26 @@ export function RoundSheet({
           <div
             className={cx(
               'flex-1 min-w-0 rounded-2xl border px-4 py-2.5 flex items-center justify-between gap-3',
-              tooMany ? 'border-danger/60 bg-danger/10' : 'border-line bg-bg',
+              tooMany ? 'border-danger/60 bg-danger/10' : isWeis ? 'border-weis/50 bg-weis/10' : 'border-line bg-bg',
             )}
           >
-            <span className={cx('text-[40px] font-bold leading-none tabular', d.points === '' && !d.match ? 'text-ink-3/40' : 'text-ink')}>
-              {d.match ? 257 : d.points || '0'}
+            <span className={cx('text-[40px] font-bold leading-none tabular', d.value === '' && typing ? 'text-ink-3/40' : 'text-ink')}>
+              {d.match && !isWeis ? 257 : d.value || '0'}
             </span>
-            <span className="text-right text-xs text-ink-3 leading-tight">
-              {tooMany ? (
-                <span className="text-danger font-semibold">max. 157</span>
-              ) : d.match ? (
-                <>Match</>
-              ) : pts !== null ? (
-                <>
-                  Gegner
-                  <br />
-                  <span className="text-base font-semibold text-ink-2 tabular">{STICH_TOTAL - pts}</span>
-                </>
-              ) : (
-                <>Stichpunkte</>
-              )}
-            </span>
+            <span className="text-right text-xs text-ink-3 leading-tight">{hint}</span>
           </div>
-          <button
-            onClick={() => set({ match: !d.match })}
-            className={cx(
-              'w-[76px] rounded-2xl border flex flex-col items-center justify-center gap-0.5 font-bold text-sm transition-colors',
-              d.match ? 'bg-gold text-[#1c1405] border-gold' : 'bg-surface-2 text-ink-2 border-line active:bg-surface-3',
-            )}
-          >
-            <Zap size={20} fill={d.match ? 'currentColor' : 'none'} />
-            Match
-          </button>
+          {!isWeis && (
+            <button
+              onClick={() => set({ match: !d.match })}
+              className={cx(
+                'w-[76px] rounded-2xl border flex flex-col items-center justify-center gap-0.5 font-bold text-sm transition-colors',
+                d.match ? 'bg-gold text-[#1c1405] border-gold' : 'bg-surface-2 text-ink-2 border-line active:bg-surface-3',
+              )}
+            >
+              <Zap size={20} fill={d.match ? 'currentColor' : 'none'} />
+              Match
+            </button>
+          )}
         </div>
 
         <Segmented<number>
@@ -204,84 +209,25 @@ export function RoundSheet({
         />
 
         <div className="grid grid-cols-3 gap-2">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
-            <button key={n} className={key} disabled={d.match} onClick={() => digit(n)}>
-              {n}
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((k) => (
+            <button key={k} className={key} disabled={!typing} onClick={() => digit(k)}>
+              {k}
             </button>
           ))}
-          <button className={cx(key, 'text-base text-ink-2')} disabled={d.match || d.points === ''} onClick={() => set({ points: '' })}>
+          <button className={cx(key, 'text-base text-ink-2')} disabled={!typing || d.value === ''} onClick={() => set({ value: '' })}>
             C
           </button>
-          <button className={key} disabled={d.match} onClick={() => digit(0)}>
+          <button className={key} disabled={!typing} onClick={() => digit(0)}>
             0
           </button>
-          <button className={cx(key, 'flex items-center justify-center')} disabled={d.match} onClick={back} aria-label="Löschen">
+          <button className={cx(key, 'flex items-center justify-center')} disabled={!typing} onClick={back} aria-label="Löschen">
             <Delete size={22} />
           </button>
         </div>
 
-        <div className="rounded-2xl border border-line bg-bg">
-          <button
-            onClick={() => set({ showWeis: !d.showWeis })}
-            className="w-full flex items-center justify-between px-4 py-3 text-[15px] font-semibold text-ink"
-          >
-            <span>
-              Weis / Stöck
-              {weisSum > 0 && <span className="ml-2 text-gold tabular">+{weisSum}</span>}
-            </span>
-            <ChevronDown size={18} className={cx('text-ink-3 transition-transform', d.showWeis && 'rotate-180')} />
-          </button>
-          {d.showWeis && (
-            <div className="grid grid-cols-2 gap-3 px-3 pb-3">
-              {([0, 1] as TeamIndex[]).map((t) => {
-                const sum = d.weis[t] + (d.stoeck[t] ? 20 : 0);
-                return (
-                  <div key={t} className="min-w-0">
-                    <div className="flex items-center gap-1.5 mb-2 min-h-[24px]">
-                      <TeamDot team={t} />
-                      <span className="text-xs text-ink-2 truncate flex-1">{names[t]}</span>
-                      {sum > 0 && (
-                        <button
-                          onClick={() => clearWeis(t)}
-                          className="inline-flex items-center gap-0.5 text-xs font-bold text-gold tabular"
-                          aria-label="Weis zurücksetzen"
-                        >
-                          {sum}
-                          <X size={13} />
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {WEIS_STEPS.map((v) => (
-                        <button
-                          key={v}
-                          onClick={() => addWeis(t, v)}
-                          className="h-10 rounded-lg bg-surface-2 border border-line text-sm font-semibold text-ink active:bg-surface-3 tabular"
-                        >
-                          {v}
-                        </button>
-                      ))}
-                      <button
-                        onClick={() => toggleStoeck(t)}
-                        className={cx(
-                          'h-10 rounded-lg border text-xs font-bold transition-colors',
-                          d.stoeck[t] ? 'bg-gold text-[#1c1405] border-gold' : 'bg-surface-2 border-line text-ink-2 active:bg-surface-3',
-                        )}
-                      >
-                        Stöck
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-              <p className="col-span-2 text-[11px] text-ink-3">Weis und Stöck zählen mit dem Multiplikator.</p>
-            </div>
-          )}
-        </div>
-
         <div className="sticky bottom-0 -mx-5 px-5 pt-3 pb-1 bg-surface border-t border-line flex items-center gap-3">
           <div className="flex-1 min-w-0 text-sm space-y-1">
-            {([d.team, other] as TeamIndex[]).map((t) => (
+            {order.map((t) => (
               <div key={t} className="flex items-center gap-2">
                 <TeamDot team={t} />
                 <span className="text-ink-2 truncate flex-1">{names[t]}</span>
@@ -289,8 +235,8 @@ export function RoundSheet({
               </div>
             ))}
           </div>
-          <Button variant="primary" size="lg" className="w-[44%]" disabled={!valid} onClick={save}>
-            {round ? 'Speichern' : pts === null && !d.match && weisSum > 0 ? 'Weis eintragen' : 'Eintragen'}
+          <Button variant={isWeis ? 'weis' : 'primary'} size="lg" className="w-[44%]" disabled={!valid} onClick={save}>
+            {round ? 'Speichern' : 'Eintragen'}
           </Button>
         </div>
       </div>
