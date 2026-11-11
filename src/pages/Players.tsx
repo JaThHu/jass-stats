@@ -1,236 +1,228 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useApp } from '../AppContext';
-import { addPlayer, deletePlayer, updatePlayer } from '../store';
+import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Check, ChevronRight, Download, Pencil, Trash2, Upload, UserPlus, Users, X } from 'lucide-react';
+import { useApp } from '../data/store';
+import { addPlayer, deletePlayer, mergeData, playerHasEvenings, renamePlayer } from '../lib/actions';
+import { parseImport, readLegacyLocal } from '../lib/legacy';
+import { playerStats } from '../lib/stats';
+import type { AppData } from '../lib/types';
+import { Avatar, Button, Card, ConfirmModal, Empty, Label, PageHeader } from '../components/ui';
+import { SyncBadge } from '../components/SyncBadge';
+import { CloudBanner } from '../components/CloudBanner';
 
 export default function Players() {
-  const { data, update } = useApp();
-  const navigate = useNavigate();
+  const { data, commit } = useApp();
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  function handleAdd() {
+  const stats = new Map(playerStats(data).map((s) => [s.playerId, s]));
+  const players = [...data.players].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+  const add = () => {
     const name = newName.trim();
     if (!name) return;
     if (data.players.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
-      alert('Ein Spieler mit diesem Namen existiert bereits.');
+      setError('Diesen Namen gibt es schon.');
       return;
     }
-    update(addPlayer(data, name));
+    commit((d) => addPlayer(d, name));
     setNewName('');
-  }
+    setError('');
+  };
 
-  function handleUpdate(id: string) {
-    const name = editName.trim();
-    if (!name) return;
-    update(updatePlayer(data, id, name));
+  const saveName = (id: string) => {
+    if (editName.trim()) commit((d) => renamePlayer(d, id, editName));
     setEditingId(null);
-  }
-
-  function handleDelete(id: string) {
-    update(deletePlayer(data, id));
-    setDeleteConfirmId(null);
-  }
-
-  const sessionCount = (playerId: string) =>
-    data.sessions.filter((s) => [...s.teams[0], ...s.teams[1]].includes(playerId)).length;
-
-  // Fixed: Sieg counts as 2 points
-  const totalChritz = (playerId: string) =>
-    data.sessions.reduce((sum, s) => {
-      const teamIdx = s.teams[0].includes(playerId) ? 0 : s.teams[1].includes(playerId) ? 1 : null;
-      if (teamIdx === null) return sum;
-      return sum + s.chritz
-        .filter((c) => c.teamIndex === teamIdx)
-        .reduce((pts, c) => pts + (c.type === 'sieg' ? 2 : 1), 0);
-    }, 0);
+  };
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold tracking-tight text-gray-900">Spieler</h2>
+    <div className="space-y-5">
+      <PageHeader title="Spieler" subtitle={`${players.length} Spieler`} />
 
-      {/* Add player */}
-      <div className="bg-white rounded-2xl shadow-sm p-4">
-        <p className="text-xs font-semibold text-gray-500 tracking-wide mb-3">NEUER SPIELER</p>
+      <Card className="p-4">
+        <Label className="mb-2">Neuer Spieler</Label>
         <div className="flex gap-2">
           <input
-            type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-            placeholder="Name eingeben..."
-            className="flex-1 bg-gray-100 rounded-xl px-4 py-3 text-base outline-none focus:bg-gray-200 transition-colors"
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+            placeholder="Name"
+            className="flex-1 min-w-0 bg-surface-2 border border-line rounded-xl px-4 py-3 text-base text-ink placeholder:text-ink-3 outline-none focus:border-brand/60"
           />
-          <button
-            onClick={handleAdd}
-            disabled={!newName.trim()}
-            className="bg-green-700 text-white px-5 py-3 rounded-xl font-semibold disabled:opacity-40 transition-opacity active:bg-green-800"
-          >
-            +
-          </button>
+          <Button variant="primary" onClick={add} disabled={!newName.trim()} aria-label="Spieler hinzufügen">
+            <UserPlus size={18} />
+          </Button>
         </div>
-      </div>
+        {error && <p className="text-sm text-danger mt-2">{error}</p>}
+        {players.length > 4 && (
+          <p className="text-xs text-ink-3 mt-2">Die Rotation verwendet die ersten vier Spieler (nach Erfassung).</p>
+        )}
+      </Card>
 
-      {/* Player list */}
-      {data.players.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <div className="text-5xl mb-4">👤</div>
-          <p className="font-medium">Noch keine Spieler angelegt.</p>
-        </div>
+      {players.length === 0 ? (
+        <Card>
+          <Empty icon={<Users size={24} />} title="Noch keine Spieler" text="Erfasse die vier Spieler eurer Jassrunde." />
+        </Card>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          {data.players.map((player, idx) => {
-            const isEditing = editingId === player.id;
-            const sessions = sessionCount(player.id);
-            const chritz = totalChritz(player.id);
-
+        <Card className="divide-y divide-line overflow-hidden">
+          {players.map((p) => {
+            const s = stats.get(p.id);
+            if (editingId === p.id) {
+              return (
+                <div key={p.id} className="flex gap-2 px-4 py-3">
+                  <input
+                    autoFocus
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveName(p.id);
+                      if (e.key === 'Escape') setEditingId(null);
+                    }}
+                    className="flex-1 min-w-0 bg-surface-2 border border-line rounded-xl px-3 py-2 text-base text-ink outline-none focus:border-brand/60"
+                  />
+                  <Button size="sm" variant="primary" onClick={() => saveName(p.id)} aria-label="Speichern">
+                    <Check size={16} />
+                  </Button>
+                  <Button size="sm" onClick={() => setEditingId(null)} aria-label="Abbrechen">
+                    <X size={16} />
+                  </Button>
+                </div>
+              );
+            }
             return (
-              <div
-                key={player.id}
-                className={`px-4 py-3.5 ${idx < data.players.length - 1 ? 'border-b border-gray-100' : ''}`}
-              >
-                {isEditing ? (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleUpdate(player.id);
-                        if (e.key === 'Escape') setEditingId(null);
-                      }}
-                      autoFocus
-                      className="flex-1 bg-gray-100 rounded-xl px-4 py-2.5 text-base outline-none focus:bg-gray-200 transition-colors"
-                    />
-                    <button
-                      onClick={() => handleUpdate(player.id)}
-                      className="bg-green-700 text-white px-4 py-2.5 rounded-xl font-semibold active:bg-green-800"
-                    >
-                      ✓
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="bg-gray-100 text-gray-500 px-4 py-2.5 rounded-xl active:bg-gray-200"
-                    >
-                      ✗
-                    </button>
+              <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+                <Link to={`/spieler/${p.id}`} className="flex items-center gap-3 flex-1 min-w-0 active:opacity-70">
+                  <Avatar name={p.name} size={38} />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-ink truncate">{p.name}</p>
+                    <p className="text-xs text-ink-3">
+                      {s?.evenings ?? 0} Abende · {s?.chritz ?? 0} Chritz
+                    </p>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <button
-                        onClick={() => navigate(`/spieler/${player.id}`)}
-                        className="font-semibold text-gray-900 active:text-green-700 transition-colors truncate block"
-                      >
-                        {player.name}
-                      </button>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {sessions} Abende · {chritz} Chritz
-                      </p>
-                    </div>
-                    <div className="flex gap-2 items-center flex-shrink-0">
-                      {deleteConfirmId === player.id ? (
-                        <>
-                          <button
-                            onClick={() => handleDelete(player.id)}
-                            className="text-xs px-3 py-2 rounded-xl bg-red-500 text-white font-semibold active:bg-red-600"
-                          >
-                            Löschen
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirmId(null)}
-                            className="text-xs px-3 py-2 rounded-xl bg-gray-100 text-gray-600 active:bg-gray-200"
-                          >
-                            Abbrechen
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => navigate(`/spieler/${player.id}`)}
-                            className="text-xs px-3 py-2 rounded-xl bg-gray-100 text-gray-600 active:bg-gray-200 font-medium"
-                          >
-                            Profil →
-                          </button>
-                          <button
-                            onClick={() => { setEditingId(player.id); setEditName(player.name); }}
-                            className="text-xs px-3 py-2 rounded-xl bg-gray-100 text-gray-600 active:bg-gray-200"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirmId(player.id)}
-                            className="text-xs px-3 py-2 rounded-xl bg-red-50 text-red-400 active:bg-red-100"
-                          >
-                            🗑️
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                  <ChevronRight size={16} className="text-ink-3 ml-auto flex-shrink-0" />
+                </Link>
+                <button
+                  onClick={() => {
+                    setEditingId(p.id);
+                    setEditName(p.name);
+                  }}
+                  aria-label="Umbenennen"
+                  className="p-2 rounded-lg text-ink-3 active:text-ink active:bg-surface-2"
+                >
+                  <Pencil size={16} />
+                </button>
+                {!playerHasEvenings(data, p.id) && (
+                  <button
+                    onClick={() => setDeleteId(p.id)}
+                    aria-label="Löschen"
+                    className="p-2 rounded-lg text-danger/80 active:bg-danger/10"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 )}
               </div>
             );
           })}
-        </div>
+        </Card>
       )}
 
-      <ExportImport />
+      <DataSection />
+
+      {deleteId && (
+        <ConfirmModal
+          title="Spieler löschen?"
+          confirmLabel="Löschen"
+          danger
+          onCancel={() => setDeleteId(null)}
+          onConfirm={() => {
+            commit((d) => deletePlayer(d, deleteId));
+            setDeleteId(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function ExportImport() {
-  const { data, update } = useApp();
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState('');
+function exportJson(data: AppData) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `jass-stats-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+function DataSection() {
+  const { data, sync, commit } = useApp();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<{ data: AppData; label: string } | null>(null);
+  const [msg, setMsg] = useState('');
+  const legacy = readLegacyLocal();
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    setImporting(true);
-    setImportError('');
     try {
-      const { importData } = await import('../store');
-      const imported = await importData(file);
-      if (window.confirm(`Daten importieren? Dies überschreibt alle aktuellen Daten (${data.players.length} Spieler, ${data.sessions.length} Abende).`)) {
-        update(imported);
-      }
+      const parsed = parseImport(JSON.parse(await file.text()));
+      setPending({ data: parsed, label: file.name });
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : 'Fehler beim Import');
-    } finally {
-      setImporting(false);
-      e.target.value = '';
+      setMsg(err instanceof Error ? err.message : 'Datei konnte nicht gelesen werden');
     }
-  }
+  };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
-      <p className="text-xs font-semibold text-gray-500 tracking-wide">DATEN</p>
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={async () => { const { exportData } = await import('../store'); exportData(data); }}
-          className="text-sm px-4 py-2.5 bg-green-700 text-white rounded-xl font-semibold active:bg-green-800 transition-colors"
-        >
-          Exportieren
-        </button>
-        <label className={`text-sm px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold active:bg-gray-200 transition-colors cursor-pointer ${importing ? 'opacity-50' : ''}`}>
-          Importieren
-          <input
-            type="file"
-            accept=".json"
-            onChange={handleImport}
-            className="hidden"
-            disabled={importing}
-          />
-        </label>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-ink">Daten</h2>
+        <SyncBadge sync={sync} />
       </div>
-      {importError && <p className="text-sm text-red-500">{importError}</p>}
-      <p className="text-xs text-gray-400">
-        Daten werden lokal gespeichert. Exportiere regelmässig als Backup.
-      </p>
-    </div>
+      <CloudBanner />
+      <Card className="p-4 space-y-3">
+        <p className="text-sm text-ink-2">
+          {sync.cloud
+            ? 'Die Daten liegen in der gemeinsamen Supabase-Datenbank und sind auf allen Handys live gleich. Ohne Netz wird lokal gespeichert und später synchronisiert.'
+            : 'Die Daten liegen nur auf diesem Gerät. Für die gemeinsame Datenbank muss Supabase eingerichtet werden (siehe README).'}
+        </p>
+        <div className="flex gap-2">
+          <Button size="sm" className="flex-1" onClick={() => exportJson(data)}>
+            <Download size={16} /> Exportieren
+          </Button>
+          <Button size="sm" className="flex-1" onClick={() => fileRef.current?.click()}>
+            <Upload size={16} /> Importieren
+          </Button>
+          <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={onFile} />
+        </div>
+        {legacy && legacy.evenings.length > 0 && sync.cloud && !sync.needsUpload && (
+          <button
+            onClick={() => setPending({ data: legacy, label: 'Daten der alten App-Version auf diesem Gerät' })}
+            className="text-sm font-semibold text-brand"
+          >
+            Alte Daten dieses Geräts übernehmen ({legacy.evenings.length} Abende)
+          </button>
+        )}
+        {msg && <p className="text-sm text-ink-2">{msg}</p>}
+      </Card>
+
+      {pending && (
+        <ConfirmModal
+          title="Daten importieren?"
+          text={`${pending.label}: ${pending.data.players.length} Spieler, ${pending.data.evenings.length} Abende. Bestehende Einträge mit gleicher ID werden überschrieben, alle anderen bleiben erhalten.`}
+          confirmLabel="Importieren"
+          onCancel={() => setPending(null)}
+          onConfirm={() => {
+            const incoming = pending.data;
+            commit((d) => mergeData(d, incoming));
+            setPending(null);
+            setMsg(`Import abgeschlossen: ${incoming.evenings.length} Abende.`);
+          }}
+        />
+      )}
+    </section>
   );
 }

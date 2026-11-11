@@ -1,13 +1,14 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AppProvider } from './AppContext';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AppProvider } from './data/AppProvider';
 import Layout from './Layout';
-import Dashboard from './pages/Dashboard';
-import NewSession from './pages/NewSession';
-import Sessions from './pages/Sessions';
+import Home from './pages/Home';
+import Tafel from './pages/Tafel';
+import Evenings from './pages/Evenings';
+import EveningDetail from './pages/EveningDetail';
+import EveningNew from './pages/EveningNew';
+import Stats from './pages/Stats';
 import Players from './pages/Players';
 import PlayerDetail from './pages/PlayerDetail';
-import Rotation from './pages/Rotation';
-import Tafel from './pages/Tafel';
 
 export default function App() {
   return (
@@ -15,13 +16,17 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/neuer-abend" element={<NewSession />} />
-            <Route path="/abende" element={<Sessions />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/tafel" element={<Tafel />} />
+            <Route path="/abende" element={<Evenings />} />
+            <Route path="/abende/neu" element={<EveningNew />} />
+            <Route path="/abende/:id" element={<EveningDetail />} />
+            <Route path="/statistik" element={<Stats />} />
             <Route path="/spieler" element={<Players />} />
             <Route path="/spieler/:id" element={<PlayerDetail />} />
-            <Route path="/rotation" element={<Rotation />} />
-            <Route path="/tafel" element={<Tafel />} />
+            <Route path="/rotation" element={<Navigate to="/" replace />} />
+            <Route path="/neuer-abend" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>

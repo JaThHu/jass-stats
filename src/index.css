@@ -2,26 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
-/* iOS safe-area support */
-.pb-safe {
-  padding-bottom: max(env(safe-area-inset-bottom), 4px);
-}
-.pt-safe {
-  padding-top: env(safe-area-inset-top);
-}
-
-/* System font & iOS background */
-body {
-  background-color: #f2f2f7;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+:root {
+  color-scheme: dark;
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  background-color: #0b0f0e;
+}
+
+body {
+  background-color: #0b0f0e;
+  color: #edf2f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
 }
 
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* iOS safe-area support */
+.pb-safe {
+  padding-bottom: max(env(safe-area-inset-bottom), 6px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Native Datumsfelder im Dark Mode */
+input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-sheet { animation: sheet-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1); }
+.animate-fade { animation: fade-in 160ms ease-out; }
+.animate-pop { animation: pop-in 200ms cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet, .animate-fade, .animate-pop { animation: none; }
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }

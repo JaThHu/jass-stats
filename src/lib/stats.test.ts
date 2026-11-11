@@ -1,0 +1,90 @@
+import { describe, expect, it } from 'vitest';
+import { convertLegacy, parseImport } from './legacy';
+import { rotationInfo } from './rotation';
+import { duoStats, headToHead, playerStats, scopeToSeason, streaks } from './stats';
+
+const legacy = {
+  players: [
+    { id: 'a', name: 'Anna', createdAt: '2025-01-01T00:00:00Z' },
+    { id: 'b', name: 'Beat', createdAt: '2025-01-02T00:00:00Z' },
+    { id: 'c', name: 'Chris', createdAt: '2025-01-03T00:00:00Z' },
+    { id: 'd', name: 'Dani', createdAt: '2025-01-04T00:00:00Z' },
+  ],
+  sessions: [
+    {
+      id: 's2',
+      date: '2026-02-01',
+      teams: [['a', 'c'], ['b', 'd']] as [string[], string[]],
+      chritz: [
+        { id: 'x1', type: 'sieg' as const, teamIndex: 1 as const },
+        { id: 'x2', type: 'match' as const, teamIndex: 1 as const },
+      ],
+    },
+    {
+      id: 's1',
+      date: '2025-12-01',
+      teams: [['a', 'b'], ['c', 'd']] as [string[], string[]],
+      chritz: [
+        { id: 'y1', type: 'bergpreis' as const, teamIndex: 0 as const },
+        { id: 'y2', type: 'sieg' as const, teamIndex: 0 as const },
+        { id: 'y3', type: 'sieg' as const, teamIndex: 0 as const },
+      ],
+    },
+  ],
+};
+
+describe('legacy import', () => {
+  it('übernimmt Spieler, Abende und Chritz', () => {
+    const d = convertLegacy(legacy);
+    expect(d.players).toHaveLength(4);
+    expect(d.evenings).toHaveLength(2);
+    expect(d.chritz).toHaveLength(5);
+    expect(d.evenings.every((e) => e.status === 'done')).toBe(true);
+    expect(parseImport(legacy)).toEqual(d);
+  });
+});
+
+describe('Statistiken', () => {
+  const d = convertLegacy(legacy);
+
+  it('zählt Chritz (Sieg = 2) und Siegquote', () => {
+    const a = playerStats(d).find((s) => s.playerId === 'a')!;
+    expect(a.chritz).toBe(5); // Bergpreis 1 + 2 Siege à 2
+    expect(a.games).toBe(3);
+    expect(a.sieg).toBe(2);
+    expect(a.winRate).toBeCloseTo(2 / 3);
+    expect(a.eveningWins).toBe(1);
+    const b = playerStats(d).find((s) => s.playerId === 'b')!;
+    expect(b.chritz).toBe(8);
+  });
+
+  it('filtert nach Saison', () => {
+    const s = playerStats(scopeToSeason(d, 2026)).find((x) => x.playerId === 'a')!;
+    expect(s.evenings).toBe(1);
+    expect(s.chritz).toBe(0);
+  });
+
+  it('Duos und Direktvergleich', () => {
+    const ab = duoStats(d).find((x) => x.key === 'a|b')!;
+    expect(ab.wins).toBe(2);
+    expect(ab.games).toBe(2);
+    const h = headToHead(d);
+    expect(h).toHaveLength(2);
+    const abcd = h.find((x) => x.key === 'a|b#c|d')!;
+    expect(abcd.wins).toEqual([2, 0]);
+  });
+
+  it('Serien in chronologischer Reihenfolge', () => {
+    const a = streaks(d).find((x) => x.playerId === 'a')!;
+    expect(a.form).toEqual(['W', 'W', 'L']);
+    expect(a.longest).toBe(2);
+    expect(a.current).toBe(0);
+  });
+
+  it('Rotation schlägt die nächste Paarung vor', () => {
+    const r = rotationInfo(d)!;
+    // Letzter Abend (2026) war A&C vs B&D = Paarung B → nächste ist C
+    expect(r.lastIndex).toBe(1);
+    expect(r.nextIndex).toBe(2);
+  });
+});
