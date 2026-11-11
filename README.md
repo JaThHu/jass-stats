@@ -1,73 +1,62 @@
-# React + TypeScript + Vite
+# Jass-Stats
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Punkte und Chritz für unsere Jassrunde: digitale Kreidetafel, automatische Chritz, Rangliste und Statistiken.
 
-Currently, two official plugins are available:
+## Funktionen
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Jassabend mit einem Tap starten.** Die nächste Paarung der Rotation (A → B → C) wird vorgeschlagen.
+- **Tafel** mit Strichen (100er/50er/20er), Fortschritt bis 1500/2500 und einer Liste aller Runden. Jede Runde lässt sich nachträglich bearbeiten oder löschen.
+- **Schnelle Eingabe.** Punkte eines der beiden Teams eintippen (das andere erhält den Rest auf 157), dazu Match, Multiplikator 1×–3× und Schnelltasten für Weis und Stöck.
+- **Automatische Chritz mit Bestätigung:**
+  - 🏔️ **Bergpreis**: das Team, das zuerst 1500 Punkte hat
+  - ⚡ **Match**: jedes Team, das einen Match macht
+  - 🏆 **Sieg** (2 Chritz): das Team, das zuerst 2500 Punkte hat
 
-## React Compiler
+  Kommen beide Teams in derselben Runde über die Grenze, fragt die App, wer zuerst war.
+- **Mehrere Partien pro Abend.** Nach einem Sieg geht es mit «Neue Partie» weiter.
+- **Statistiken:** Siegquote, bestes Duo, Direktvergleich der Paarungen, Ø Punkte pro Runde, Weis, Rekorde, Chritz-Verlauf, Siegesserien, alles pro Saison (Jahr) filterbar.
+- **Abend-Rückblick** mit Punkteverlauf jeder Partie.
+- **Cloud-Datenbank (Supabase).** Alle Handys sehen live dieselben Daten. Ohne Netz wird lokal gespeichert und später synchronisiert.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Supabase einrichten (einmalig, ca. 10 Minuten)
 
-## Expanding the ESLint configuration
+Ohne Supabase läuft die App wie bisher nur lokal auf einem Gerät.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. Auf [supabase.com](https://supabase.com) ein Gratis-Konto erstellen und ein neues Projekt anlegen (Region z. B. *Central EU (Frankfurt)*).
+2. Im Projekt links auf **SQL Editor** → **New query**, den ganzen Inhalt von [`supabase/schema.sql`](supabase/schema.sql) einfügen und **Run** klicken.
+3. Unter **Project Settings → API** (bzw. **API Keys**) zwei Werte kopieren:
+   - **Project URL**, z. B. `https://abcd1234.supabase.co`
+   - **anon / publishable key**
+4. In **Vercel** beim Projekt unter **Settings → Environment Variables** eintragen:
+   - `VITE_SUPABASE_URL` = Project URL
+   - `VITE_SUPABASE_ANON_KEY` = anon / publishable key
+5. In Vercel unter **Deployments** das letzte Deployment **Redeploy**en, damit die Variablen übernommen werden.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Bestehende Daten übernehmen
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Auf dem Handy, auf dem bisher gejasst wurde, die App öffnen. Sie erkennt die alten Daten und zeigt «Daten in die Cloud übernehmen?» an. Dort auf **Hochladen** tippen, fertig.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Alternativ: Auf dem alten Handy unter *Spieler → Daten → Exportieren* eine Datei speichern und sie auf einem anderen Gerät importieren.
+
+> Hinweis: Wie gewünscht gibt es keinen Login. Wer den Link zur App kennt, kann Daten lesen und ändern. Exportiere ab und zu ein Backup (*Spieler → Daten → Exportieren*).
+
+## Entwicklung
+
+```bash
+npm install
+npm run dev      # Entwicklungsserver
+npm test         # Unit-Tests (Punkte, Chritz-Erkennung, Statistiken)
+npm run build    # Produktions-Build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Für die Cloud lokal: `.env.example` nach `.env` kopieren und die Supabase-Werte eintragen.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Aufbau
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| Ordner | Inhalt |
+|---|---|
+| `src/lib/` | Reine Logik: Punkte (`scoring.ts`), Chritz-Erkennung, Statistiken (`stats.ts`), Aktionen (`actions.ts`) |
+| `src/data/` | Speicherung: lokaler Cache, Warteschlange für Offline-Änderungen, Supabase-Sync mit Live-Updates |
+| `src/components/` | UI-Bausteine, Tafel, Eingabe, Diagramme |
+| `src/pages/` | Seiten: Rangliste, Tafel, Abende, Statistik, Spieler |
+| `supabase/schema.sql` | Datenbank-Schema |

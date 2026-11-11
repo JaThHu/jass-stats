@@ -1,175 +1,151 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-} from 'recharts';
-import { useApp } from '../AppContext';
-import { computePlayerStats, getPlayerHistory } from '../store';
-import { CHRITZ_LABELS, CHRITZ_ICONS } from '../types';
-import type { ChritzType } from '../types';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, UserX } from 'lucide-react';
+import { useApp } from '../data/store';
+import { playerColor } from '../lib/colors';
+import { formatDate, nameOf, pct, teamName } from '../lib/format';
+import { sortEveningsDesc } from '../lib/rotation';
+import { chritzPoints, chritzTimeline, duoStats, playerStats, streaks, teamOf } from '../lib/stats';
+import { CHRITZ_ICONS, CHRITZ_LABELS, CHRITZ_TYPES } from '../lib/types';
+import { TimelineChart } from '../components/charts';
+import { Avatar, Button, Card, Empty, Label, StatTile } from '../components/ui';
+import { cx } from '../lib/cx';
 
 export default function PlayerDetail() {
   const { id } = useParams<{ id: string }>();
   const { data } = useApp();
   const navigate = useNavigate();
-
   const player = data.players.find((p) => p.id === id);
-  if (!player) {
+
+  if (!player || !id) {
     return (
-      <div className="text-center py-16 text-gray-400">
-        <p>Spieler nicht gefunden.</p>
-        <button onClick={() => navigate('/spieler')} className="mt-4 text-green-700 text-sm font-semibold">← Zurück</button>
-      </div>
+      <Card className="mt-4">
+        <Empty icon={<UserX size={24} />} title="Spieler nicht gefunden">
+          <Button onClick={() => navigate('/spieler')}>Zu den Spielern</Button>
+        </Empty>
+      </Card>
     );
   }
 
-  const allStats = computePlayerStats(data);
-  const myStats = allStats.find((s) => s.playerId === id);
-  const rank = allStats.findIndex((s) => s.playerId === id) + 1;
-  const history = getPlayerHistory(data, id!);
-
-  const playerName = (pid: string) => data.players.find((p) => p.id === pid)?.name ?? '?';
-
-  const mySessions = data.sessions
-    .filter((s) => [...s.teams[0], ...s.teams[1]].includes(id!))
-    .sort((a, b) => b.date.localeCompare(a.date));
-
-  const medals = ['🥇', '🥈', '🥉'];
-  const rankLabel = rank <= 3 ? medals[rank - 1] : `#${rank}`;
+  const all = playerStats(data).filter((s) => s.evenings > 0);
+  const me = playerStats(data).find((s) => s.playerId === id)!;
+  const rank = all.findIndex((s) => s.playerId === id) + 1;
+  const partners = duoStats(data).filter((d) => d.players.includes(id));
+  const streak = streaks(data).find((s) => s.playerId === id);
+  const evenings = sortEveningsDesc(data.evenings).filter((e) => teamOf(e, id) !== null);
+  const timeline = chritzTimeline({ ...data, evenings }).map((p) => ({ date: p.date, [id]: p[id] }));
 
   return (
     <div className="space-y-4">
-      {/* Back */}
-      <button
-        onClick={() => navigate('/spieler')}
-        className="text-sm text-gray-400 font-medium active:text-green-700 transition-colors"
-      >
-        ← Spieler
+      <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm font-semibold text-ink-3 active:text-ink pt-1">
+        <ChevronLeft size={18} /> Zurück
       </button>
 
-      {/* Header */}
-      <div className="bg-white rounded-2xl shadow-sm p-5 flex items-center gap-4">
-        <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center text-2xl font-bold text-green-700 flex-shrink-0">
-          {player.name.charAt(0).toUpperCase()}
-        </div>
+      <div className="flex items-center gap-4">
+        <Avatar name={player.name} size={60} />
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">{player.name}</h2>
-          <p className="text-gray-400 text-sm mt-0.5">Rang {rankLabel} · {myStats?.sessions ?? 0} Abende</p>
+          <h1 className="text-[28px] font-bold text-ink leading-tight">{player.name}</h1>
+          <p className="text-sm text-ink-3">
+            {rank > 0 ? `Rang ${rank} von ${all.length}` : 'Noch keine Abende'} · {me.evenings} Abende
+          </p>
         </div>
       </div>
 
-      {/* Stats cards */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-green-700 text-white rounded-2xl p-4 col-span-1">
-          <p className="text-green-200 text-xs font-semibold tracking-wide">TOTAL CHRITZ</p>
-          <p className="text-4xl font-bold mt-1">{myStats?.total ?? 0}</p>
+        <div className="rounded-2xl p-4 bg-brand text-[#06140d] row-span-2 flex flex-col justify-between">
+          <p className="text-xs font-semibold opacity-70">Chritz total</p>
+          <p className="text-6xl font-bold leading-none">{me.chritz}</p>
+          <p className="text-xs font-semibold opacity-70">
+            Ø {me.evenings ? (me.chritz / me.evenings).toFixed(1) : '0'} pro Abend
+          </p>
         </div>
-        <div className="grid grid-cols-1 gap-3 col-span-1">
-          {(['match', 'bergpreis', 'sieg'] as ChritzType[]).map((type) => (
-            <div key={type} className="bg-white rounded-2xl shadow-sm p-3 flex items-center justify-between">
-              <span className="text-sm text-gray-500 flex items-center gap-1.5">
-                <span>{CHRITZ_ICONS[type]}</span>
-                <span className="font-medium">{CHRITZ_LABELS[type]}</span>
-              </span>
-              <span className="text-xl font-bold text-gray-900">{myStats?.[type] ?? 0}</span>
-            </div>
-          ))}
-        </div>
+        <StatTile label="Siegquote" value={pct(me.winRate)} sub={`${me.sieg} von ${me.games} Partien`} />
+        <StatTile label="Abendsiege" value={me.eveningWins} sub={`von ${me.evenings} Abenden`} />
       </div>
 
-      {/* Line chart */}
-      {history.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm p-4">
-          <p className="text-xs font-semibold text-gray-500 tracking-wide mb-4">VERLAUF</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={history} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11, fontFamily: 'inherit' }}
-                tickFormatter={(d) => new Date(d + 'T12:00:00').toLocaleDateString('de-CH', { day: 'numeric', month: 'short' })}
-              />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11, fontFamily: 'inherit' }} />
-              <Tooltip
-                labelFormatter={(d) => new Date(d + 'T12:00:00').toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' })}
-                formatter={(val, name) => [val, name === 'cumulative' ? 'Total Chritz' : 'Chritz diesen Abend']}
-                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontFamily: 'inherit' }}
-              />
-              <Line
-                type="monotone"
-                dataKey="cumulative"
-                stroke="#15803d"
-                strokeWidth={2.5}
-                dot={{ r: 4, fill: '#15803d' }}
-                name="cumulative"
-              />
-              <Line
-                type="monotone"
-                dataKey="chritz"
-                stroke="#86efac"
-                strokeWidth={1.5}
-                dot={false}
-                strokeDasharray="4 4"
-                name="chritz"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-          <div className="flex gap-4 mt-2 text-xs text-gray-400">
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-0.5 bg-green-700 inline-block rounded"></span>Kumulativ
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-0.5 bg-green-300 inline-block rounded border-t border-dashed border-green-300"></span>Pro Abend
-            </span>
+      <Card className="grid grid-cols-3 divide-x divide-line">
+        {CHRITZ_TYPES.map((t) => (
+          <div key={t} className="py-3 text-center">
+            <p className="text-lg">{CHRITZ_ICONS[t]}</p>
+            <p className="text-xl font-bold text-ink">{me[t]}</p>
+            <p className="text-[11px] text-ink-3">{CHRITZ_LABELS[t]}</p>
           </div>
+        ))}
+      </Card>
+
+      {(me.avgPoints !== null || (streak && streak.longest > 0)) && (
+        <div className="grid grid-cols-2 gap-3">
+          {me.avgPoints !== null && <StatTile label="Ø Punkte pro Runde" value={Math.round(me.avgPoints)} sub={`Weis total ${me.weis}`} />}
+          {streak && streak.longest > 0 && (
+            <StatTile label="Längste Siegesserie" value={streak.longest} sub={streak.current > 0 ? `aktuell ${streak.current}` : undefined} />
+          )}
         </div>
       )}
 
-      {/* Sessions list */}
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-xs font-semibold text-gray-500 tracking-wide">ALLE ABENDE</p>
-        </div>
-        {mySessions.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm py-8">Noch keine Abende gespielt.</p>
-        ) : (
-          <div>
-            {mySessions.map((session, idx) => {
-              const myTeamIdx = session.teams[0].includes(id!) ? 0 : 1;
-              const myTeam = session.teams[myTeamIdx];
-              const otherTeam = session.teams[myTeamIdx === 0 ? 1 : 0];
-              const partnerIds = myTeam.filter((pid) => pid !== id);
-              const myChritz = session.chritz
-                .filter((c) => c.teamIndex === myTeamIdx)
-                .reduce((sum, c) => sum + (c.type === 'sieg' ? 2 : 1), 0);
-
+      {partners.length > 0 && (
+        <Card className="p-4">
+          <Label className="mb-3">Mit Partner</Label>
+          <div className="space-y-3">
+            {partners.map((d) => {
+              const partner = d.players.find((p) => p !== id)!;
               return (
-                <div
-                  key={session.id}
-                  className={`px-4 py-3.5 flex items-center gap-3 ${idx < mySessions.length - 1 ? 'border-b border-gray-100' : ''}`}
-                >
+                <div key={d.key} className="flex items-center gap-3">
+                  <Avatar name={nameOf(data, partner)} size={32} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">
-                      {new Date(session.date + 'T12:00:00').toLocaleDateString('de-CH', {
-                        day: 'numeric', month: 'short', year: '2-digit',
-                      })}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5 truncate">
-                      mit {partnerIds.map(playerName).join(', ') || '—'}
-                      <span className="text-gray-300 mx-1.5">vs</span>
-                      {otherTeam.map(playerName).join(' & ')}
+                    <p className="font-semibold text-ink truncate">{nameOf(data, partner)}</p>
+                    <p className="text-xs text-ink-3">
+                      {d.wins}/{d.games} Partien · {d.evenings} Abende
                     </p>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0 ${
-                    myChritz > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-400'
-                  }`}>
-                    {myChritz} Chritz
-                  </span>
+                  <span className="font-bold text-ink tabular">{pct(d.winRate)}</span>
                 </div>
               );
             })}
           </div>
-        )}
-      </div>
+        </Card>
+      )}
+
+      {timeline.length > 1 && (
+        <Card className="p-4">
+          <Label className="mb-3">Chritz-Verlauf</Label>
+          <TimelineChart points={timeline} players={[{ id, name: player.name, color: playerColor(data, id) }]} hideLegend />
+        </Card>
+      )}
+
+      <Card className="overflow-hidden">
+        <div className="px-4 pt-4 pb-2">
+          <Label>Abende</Label>
+        </div>
+        {evenings.length === 0 && <p className="px-4 pb-4 text-sm text-ink-3">Noch keine Abende.</p>}
+        {evenings.map((ev) => {
+          const t = teamOf(ev, id)!;
+          const cp = chritzPoints(data.chritz.filter((c) => c.eveningId === ev.id));
+          const partner = ev.teams[t].filter((p) => p !== id);
+          const won = cp[t] > cp[1 - t];
+          return (
+            <Link
+              key={ev.id}
+              to={`/abende/${ev.id}`}
+              className="flex items-center gap-3 px-4 py-3 border-t border-line active:bg-surface-2"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-ink">{formatDate(ev.date, 'short')}</p>
+                <p className="text-xs text-ink-3 truncate">
+                  mit {teamName(data, partner) || '–'} <span className="mx-1">vs</span> {teamName(data, ev.teams[1 - t])}
+                </p>
+              </div>
+              <span
+                className={cx(
+                  'text-sm font-bold tabular px-2.5 py-1 rounded-full',
+                  won ? 'bg-gold/15 text-gold' : 'bg-surface-2 text-ink-3',
+                )}
+              >
+                {cp[t]} : {cp[1 - t]}
+              </span>
+              <ChevronRight size={16} className="text-ink-3" />
+            </Link>
+          );
+        })}
+      </Card>
     </div>
   );
 }
