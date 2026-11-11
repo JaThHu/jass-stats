@@ -48,6 +48,17 @@ export function isWeisOnly(r: Pick<Round, 'stichTeam' | 'stichPoints' | 'matchTe
   return r.matchTeam === null && (r.stichTeam === null || r.stichPoints === null);
 }
 
+/** Gespielte Runde (Stich oder Match). Reine Weis-Einträge zählen nicht als Runde. */
+export function isPlayedRound(r: Pick<Round, 'stichTeam' | 'stichPoints' | 'matchTeam'>): boolean {
+  return !isWeisOnly(r);
+}
+
+/** Stichpunkte inkl. Multiplikator, ohne Weis. */
+export function stichPoints(r: Pick<Round, 'stichTeam' | 'stichPoints' | 'matchTeam' | 'multiplier'>): Pair {
+  const s = stichPair(r);
+  return [s[0] * r.multiplier, s[1] * r.multiplier];
+}
+
 export function compareRounds(a: Round, b: Round): number {
   return a.seq - b.seq || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
 }

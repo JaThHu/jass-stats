@@ -15,6 +15,7 @@ import {
   type Season,
 } from '../lib/stats';
 import { CHRITZ_ICONS } from '../lib/types';
+import { isPlayedRound } from '../lib/scoring';
 import { TimelineChart } from '../components/charts';
 import { SeasonChips } from '../components/SeasonChips';
 import { Card, Empty, Label, PageHeader, StatTile } from '../components/ui';
@@ -44,7 +45,8 @@ export default function Stats() {
   const timeline = chritzTimeline(d);
   const active = ps.map((s) => s.playerId);
   const decidedGames = d.chritz.filter((c) => c.type === 'sieg').length;
-  const hasRounds = d.rounds.length > 0;
+  const played = d.rounds.filter(isPlayedRound).length;
+  const hasRounds = played > 0;
 
   return (
     <div className="space-y-6">
@@ -55,7 +57,7 @@ export default function Stats() {
         <StatTile label="Abende" value={d.evenings.length} />
         <StatTile label="Partien" value={decidedGames} sub="entschieden" />
         <StatTile label="Matches" value={d.chritz.filter((c) => c.type === 'match').length} />
-        <StatTile label="Runden" value={hasRounds ? d.rounds.length : '–'} sub={hasRounds ? 'auf der Tafel' : 'ab Tafel-Abenden'} />
+        <StatTile label="Runden" value={hasRounds ? played : '–'} sub={hasRounds ? 'auf der Tafel' : 'ab Tafel-Abenden'} />
       </div>
 
       {/* ───────── Siege & Partner ───────── */}

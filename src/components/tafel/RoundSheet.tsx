@@ -135,7 +135,9 @@ export function RoundSheet({
 
   return (
     <Sheet
-      title={round ? `Runde ${roundNumber} bearbeiten` : isWeis ? 'Weis schreiben' : `Runde ${roundNumber}`}
+      title={
+        isWeis ? (round ? 'Weis bearbeiten' : 'Weis schreiben') : round ? `Runde ${roundNumber} bearbeiten` : `Runde ${roundNumber}`
+      }
       onClose={onClose}
       right={
         onDelete && (

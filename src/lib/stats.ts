@@ -1,4 +1,4 @@
-import { gamesOfEvening, progression, roundPoints, roundsOfGame, totals, weisPair, type Pair } from './scoring';
+import { gamesOfEvening, isPlayedRound, progression, roundsOfGame, stichPoints, totals, weisPair, type Pair } from './scoring';
 import {
   CHRITZ_VALUE,
   type AppData,
@@ -119,9 +119,10 @@ export function playerStats(data: AppData): PlayerStat[] {
           s[c.type] += 1;
         }
         for (const r of rounds) {
-          s.rounds += 1;
-          s.points += roundPoints(r)[t];
           s.weis += weisPair(r)[t] * r.multiplier;
+          if (!isPlayedRound(r)) continue;
+          s.rounds += 1;
+          s.points += stichPoints(r)[t];
         }
       }
     }
@@ -324,10 +325,10 @@ export function records(data: AppData): Records {
   for (const r of data.rounds) {
     const ev = evById.get(r.eveningId);
     if (!ev) continue;
-    const p = roundPoints(r);
+    const p = isPlayedRound(r) ? stichPoints(r) : [0, 0];
     const w = weisPair(r);
     for (const t of [0, 1] as TeamIndex[]) {
-      if (p[t] > best) {
+      if (p[t] > best && p[t] > 0) {
         best = p[t];
         out.highestRound = { label: 'Höchste Runde', value: `${p[t]} Pkt`, team: ev.teams[t], eveningId: ev.id, date: ev.date };
       }
@@ -397,12 +398,15 @@ export function records(data: AppData): Records {
 export interface GameSummary {
   game: Game;
   rounds: Round[];
+  /** Gespielte Runden (ohne reine Weis-Einträge). */
+  played: number;
   totals: Pair;
   winner: TeamIndex | null;
   matches: Pair;
   weis: Pair;
   highest: { points: number; team: TeamIndex } | null;
-  series: { n: number; a: number; b: number }[];
+  /** Verlauf: n = Anzahl gespielter Runden; Weis-Einträge teilen sich n mit der Runde davor. */
+  series: { n: number; a: number; b: number; weis: boolean }[];
 }
 
 export function gameSummary(data: AppData, game: Game): GameSummary {
@@ -411,25 +415,34 @@ export function gameSummary(data: AppData, game: Game): GameSummary {
   const matches: Pair = [0, 0];
   const weis: Pair = [0, 0];
   let highest: GameSummary['highest'] = null;
+  let played = 0;
+  const series: GameSummary['series'] = [{ n: 0, a: 0, b: 0, weis: false }];
   for (const s of steps) {
     if (s.round.matchTeam !== null) matches[s.round.matchTeam] += 1;
     const w = weisPair(s.round);
     weis[0] += w[0] * s.round.multiplier;
     weis[1] += w[1] * s.round.multiplier;
-    for (const t of [0, 1] as TeamIndex[]) {
-      if (!highest || s.points[t] > highest.points) highest = { points: s.points[t], team: t };
+    const isRound = isPlayedRound(s.round);
+    if (isRound) {
+      played += 1;
+      const p = stichPoints(s.round);
+      for (const t of [0, 1] as TeamIndex[]) {
+        if (!highest || p[t] > highest.points) highest = { points: p[t], team: t };
+      }
     }
+    series.push({ n: played, a: s.after[0], b: s.after[1], weis: !isRound });
   }
   const win = data.chritz.find((c) => c.gameId === game.id && c.type === 'sieg');
   return {
     game,
     rounds,
+    played,
     totals: steps.length ? steps[steps.length - 1].after : [0, 0],
     winner: win ? win.team : null,
     matches,
     weis,
     highest,
-    series: [{ n: 0, a: 0, b: 0 }, ...steps.map((s, i) => ({ n: i + 1, a: s.after[0], b: s.after[1] }))],
+    series,
   };
 }
 
@@ -457,7 +470,7 @@ export function eveningSummary(data: AppData, eveningId: string): EveningSummary
     points: chritzPoints(chritz),
     byType,
     games: gamesOfEvening(data, eveningId).map((g) => gameSummary(data, g)),
-    rounds: data.rounds.filter((r) => r.eveningId === eveningId).length,
+    rounds: data.rounds.filter((r) => r.eveningId === eveningId && isPlayedRound(r)).length,
   };
 }
 
