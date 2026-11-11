@@ -96,7 +96,8 @@ export default function EveningDetail() {
       )}
 
       {/* Partien */}
-      {games
+      {[...games]
+        .reverse()
         .filter((g) => g.rounds.length > 0)
         .map((g) => (
           <Card key={g.game.id} className="p-4 space-y-3">
@@ -110,7 +111,7 @@ export default function EveningDetail() {
               <span className="text-2xl font-bold text-ink">{g.totals[0]}</span>
               <span className="text-ink-3">:</span>
               <span className="text-2xl font-bold text-ink">{g.totals[1]}</span>
-              <span className="text-xs text-ink-3 ml-auto">{g.rounds.length} {g.rounds.length === 1 ? 'Runde' : 'Runden'}</span>
+              <span className="text-xs text-ink-3 ml-auto">{g.played} {g.played === 1 ? 'Runde' : 'Runden'}</span>
             </div>
             <GameChart series={g.series} names={names} />
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -150,7 +151,7 @@ export default function EveningDetail() {
         {summary.chritz.length === 0 && !editing && <p className="text-sm text-ink-3">Keine Chritz an diesem Abend.</p>}
         <div className="space-y-1.5">
           {[...summary.chritz]
-            .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
             .map((c) => (
               <div key={c.id} className="flex items-center gap-2.5 text-sm py-1">
                 <span className="w-6 text-center">{CHRITZ_ICONS[c.type]}</span>

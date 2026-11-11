@@ -42,7 +42,14 @@ export function Legend({ items }: { items: { label: string; color: string }[] })
 }
 
 /** Punkteverlauf einer Partie: kumulierte Punkte beider Teams pro Runde. */
-export function GameChart({ series, names }: { series: { n: number; a: number; b: number }[]; names: [string, string] }) {
+export function GameChart({
+  series,
+  names,
+}: {
+  series: { n: number; a: number; b: number; weis?: boolean }[];
+  names: [string, string];
+}) {
+  const rounds = series[series.length - 1]?.n ?? 0;
   const max = Math.max(2500, ...series.map((s) => Math.max(s.a, s.b)));
   return (
     <div className="space-y-2">
@@ -51,7 +58,15 @@ export function GameChart({ series, names }: { series: { n: number; a: number; b
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke={GRID} vertical={false} />
-            <XAxis dataKey="n" tick={AXIS} tickLine={false} axisLine={{ stroke: GRID }} allowDecimals={false} />
+            <XAxis
+              dataKey="n"
+              type="number"
+              domain={[0, Math.max(1, rounds)]}
+              tick={AXIS}
+              tickLine={false}
+              axisLine={{ stroke: GRID }}
+              allowDecimals={false}
+            />
             <YAxis
               tick={AXIS}
               tickLine={false}
@@ -64,7 +79,11 @@ export function GameChart({ series, names }: { series: { n: number; a: number; b
             <ReferenceLine y={2500} stroke="#4a5853" strokeDasharray="4 4" />
             <Tooltip
               {...tooltipStyle}
-              labelFormatter={(n) => (Number(n) === 0 ? 'Start' : `Runde ${n}`)}
+              labelFormatter={(n, payload) => {
+                const weis = (payload?.[0]?.payload as { weis?: boolean } | undefined)?.weis;
+                if (weis) return Number(n) === 0 ? 'Weis vor Runde 1' : `Weis nach Runde ${n}`;
+                return Number(n) === 0 ? 'Start' : `Runde ${n}`;
+              }}
               formatter={(v, key) => [v as number, key === 'a' ? names[0] : names[1]]}
             />
             <Line type="linear" dataKey="a" stroke={TEAM_COLORS[0]} strokeWidth={2} dot={false} activeDot={{ r: 4, stroke: '#141a18', strokeWidth: 2 }} isAnimationActive={false} />

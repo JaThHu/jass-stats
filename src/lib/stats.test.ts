@@ -102,3 +102,29 @@ describe('Mein Team unten', () => {
     expect(myTeam(ev, null)).toBe(0);
   });
 });
+
+describe('Weis zählt nicht als Runde', () => {
+  it('Runden, Ø Punkte und Verlauf ohne Weis-Einträge', async () => {
+    const { startEvening, addRound } = await import('./actions');
+    const { gameSummary, eveningSummary } = await import('./stats');
+    const base = convertLegacy({ players: legacy.players, sessions: [] });
+    let d = startEvening(base, [['a', 'b'], ['c', 'd']], '2026-11-11');
+    const g = d.games[0];
+    const r = (p: Partial<Parameters<typeof addRound>[2]>) => ({
+      multiplier: 1, stichTeam: null, stichPoints: null, matchTeam: null, weis: [0, 0] as [number, number], stoeck: [false, false] as [boolean, boolean], ...p,
+    });
+    d = addRound(d, g.id, r({ stichTeam: 0, stichPoints: 100 }));
+    d = addRound(d, g.id, r({ weis: [150, 0] }));
+    d = addRound(d, g.id, r({ stichTeam: 1, stichPoints: 57, multiplier: 2 }));
+
+    const sum = gameSummary(d, g);
+    expect(sum.played).toBe(2);
+    expect(sum.series.map((p) => [p.n, p.weis])).toEqual([[0, false], [1, false], [1, true], [2, false]]);
+    expect(eveningSummary(d, d.evenings[0].id)!.rounds).toBe(2);
+
+    const a = playerStats(d).find((s) => s.playerId === 'a')!;
+    expect(a.rounds).toBe(2);
+    expect(a.weis).toBe(150);
+    expect(a.avgPoints).toBe((100 + 200) / 2); // Stichpunkte: 100 und (157−57)×2
+  });
+});

@@ -116,6 +116,12 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
     return { sum, count };
   };
   const weisGame = weisOf(rounds);
+
+  // Weis-Einträge stehen im Verlauf, zählen aber nicht als Runde.
+  const roundNo = new Map<string, number | null>();
+  let playedCount = 0;
+  for (const r of rounds) roundNo.set(r.id, isWeisOnly(r) ? null : ++playedCount);
+  const weisEntries = rounds.length - playedCount;
   const weisEvening = weisOf(data.rounds.filter((r) => r.eveningId === eveningId));
 
   const saveRound = (input: Parameters<typeof addRound>[2]) => {
@@ -157,7 +163,7 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
           <p className="text-sm text-ink-3">{formatDate(evening.date)}</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" onClick={() => setConfirm('undo')} disabled={!lastRound} aria-label="Letzte Runde löschen">
+          <Button size="sm" onClick={() => setConfirm('undo')} disabled={!lastRound} aria-label="Letzten Eintrag löschen">
             <Undo2 size={16} /> Rückgängig
           </Button>
         </div>
@@ -262,7 +268,8 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
         </div>
         {games.length > 1 && (
           <p className="text-xs text-ink-3 mt-3">
-            {games
+            {[...games]
+              .reverse()
               .map((g) => {
                 const w = gameWinner(data, g.id);
                 return `Partie ${g.number}: ${w === null ? 'offen' : names[w]}`;
@@ -275,15 +282,18 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
       {/* ── Runden ── */}
       <Card className="overflow-hidden">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-          <Label>Runden ({rounds.length})</Label>
+          <Label>
+            Verlauf · {playedCount} {playedCount === 1 ? 'Runde' : 'Runden'}
+            {weisEntries > 0 && ` · ${weisEntries} Weis`}
+          </Label>
           <span className="text-[11px] text-ink-3">Antippen zum Bearbeiten</span>
         </div>
         {rounds.length === 0 ? (
-          <p className="px-4 pb-4 text-sm text-ink-3">Noch keine Runde. Tippe auf ＋ bei einem Team.</p>
+          <p className="px-4 pb-4 text-sm text-ink-3">Noch keine Einträge. Tippe auf ＋ bei einem Team.</p>
         ) : (
           <div className="divide-y divide-line">
             {[...steps].reverse().map((s) => {
-              const n = steps.indexOf(s) + 1;
+              const n = roundNo.get(s.round.id);
               const w = weisPair(s.round);
               return (
                 <button
@@ -291,7 +301,7 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
                   onClick={() => setSheet({ team: s.round.stichTeam ?? s.round.matchTeam ?? bottom, round: s.round })}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left active:bg-surface-2 transition-colors"
                 >
-                  <span className="w-6 text-xs font-semibold text-ink-3 tabular">{n}</span>
+                  <span className="w-6 text-xs font-semibold text-ink-3 tabular">{n ?? ''}</span>
                   <span className="flex-1 flex items-center gap-1.5 text-xs text-ink-3 min-w-0">
                     {s.round.multiplier > 1 && (
                       <span className="px-1.5 py-0.5 rounded bg-gold/15 text-gold font-bold">{s.round.multiplier}×</span>
@@ -336,7 +346,7 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
           order={order}
           initialTeam={sheet.team}
           round={sheet.round}
-          roundNumber={sheet.round ? rounds.findIndex((r) => r.id === sheet.round!.id) + 1 : rounds.length + 1}
+          roundNumber={sheet.round ? (roundNo.get(sheet.round.id) ?? playedCount) : playedCount + 1}
           lastMultiplier={lastMultiplier}
           onSave={saveRound}
           onDelete={sheet.round ? () => setConfirm('delete') : undefined}
@@ -361,8 +371,11 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
 
       {confirm === 'undo' && lastRound && (
         <ConfirmModal
-          title="Letzte Runde löschen?"
-          text={`${names[0]} ${steps[steps.length - 1].points[0]} · ${names[1]} ${steps[steps.length - 1].points[1]}`}
+          title={isWeisOnly(lastRound) ? 'Letzten Weis löschen?' : `Runde ${playedCount} löschen?`}
+          text={order
+            .filter((t) => !isWeisOnly(lastRound) || steps[steps.length - 1].points[t] > 0)
+            .map((t) => `${names[t]} ${steps[steps.length - 1].points[t]}`)
+            .join(' · ')}
           confirmLabel="Löschen"
           danger
           onCancel={() => setConfirm(null)}
@@ -374,8 +387,8 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
       )}
       {confirm === 'delete' && sheet?.round && (
         <ConfirmModal
-          title="Runde löschen?"
-          text="Automatisch eingetragene Chritz dieser Runde werden ebenfalls entfernt."
+          title={isWeisOnly(sheet.round) ? 'Weis löschen?' : 'Runde löschen?'}
+          text="Automatisch eingetragene Chritz dieses Eintrags werden ebenfalls entfernt."
           confirmLabel="Löschen"
           danger
           onCancel={() => setConfirm(null)}
