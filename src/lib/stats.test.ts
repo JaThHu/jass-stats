@@ -88,3 +88,17 @@ describe('Statistiken', () => {
     expect(r.nextIndex).toBe(2);
   });
 });
+
+describe('Mein Team unten', () => {
+  it('erkennt Janick als Standard und findet sein Team', async () => {
+    const { myTeam, resolveMe } = await import('./me');
+    const players = [
+      { id: 'x', name: 'Tom', createdAt: '' },
+      { id: 'j', name: 'Janick', createdAt: '' },
+    ];
+    expect(resolveMe({ players })).toBe('j');
+    const ev = { id: 'e', date: '2026-01-01', teams: [['x', 'y'], ['j', 'z']] as [string[], string[]], status: 'active' as const, notes: null, createdAt: '' };
+    expect(myTeam(ev, 'j')).toBe(1);
+    expect(myTeam(ev, null)).toBe(0);
+  });
+});

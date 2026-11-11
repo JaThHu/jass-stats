@@ -5,8 +5,9 @@ Punkte und Chritz für unsere Jassrunde: digitale Kreidetafel, automatische Chri
 ## Funktionen
 
 - **Jassabend mit einem Tap starten.** Die nächste Paarung der Rotation (A → B → C) wird vorgeschlagen.
-- **Tafel** mit Strichen (100er/50er/20er), Fortschritt bis 1500/2500 und einer Liste aller Runden. Jede Runde lässt sich nachträglich bearbeiten oder löschen.
-- **Schnelle Eingabe.** Punkte eines der beiden Teams eintippen (das andere erhält den Rest auf 157), dazu Match, Multiplikator 1×–3× und Schnelltasten für Weis und Stöck.
+- **Tafel** mit Strichen (100er/50er/20er), Fortschritt bis 1500/2500, Weis-Übersicht und einer Liste aller Runden. Jede Runde lässt sich nachträglich bearbeiten oder löschen.
+- **Mein Team unten.** Das Team des Spielers, der auf dem Handy schreibt, steht auf der Tafel unten. Einstellbar pro Gerät unter *Spieler → Dieses Gerät* (Standard: Janick).
+- **Schnelle Eingabe.** Mit dem Schalter *Punkte / Weis* wählen, dann die Zahl eintippen. Bei Punkten erhält das andere Team den Rest auf 157. Dazu gibt es Match und den Multiplikator 1×–3× (gilt auch für Weis). Stöck werden als Weis 20 geschrieben.
 - **Automatische Chritz mit Bestätigung:**
   - 🏔️ **Bergpreis**: das Team, das zuerst 1500 Punkte hat
   - ⚡ **Match**: jedes Team, das einen Match macht

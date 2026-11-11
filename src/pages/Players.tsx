@@ -6,7 +6,8 @@ import { addPlayer, deletePlayer, mergeData, playerHasEvenings, renamePlayer } f
 import { parseImport, readLegacyLocal } from '../lib/legacy';
 import { playerStats } from '../lib/stats';
 import type { AppData } from '../lib/types';
-import { Avatar, Button, Card, ConfirmModal, Empty, Label, PageHeader } from '../components/ui';
+import { Avatar, Button, Card, Chip, ConfirmModal, Empty, Label, PageHeader } from '../components/ui';
+import { resolveMe, setMe } from '../lib/me';
 import { SyncBadge } from '../components/SyncBadge';
 import { CloudBanner } from '../components/CloudBanner';
 
@@ -129,6 +130,8 @@ export default function Players() {
         </Card>
       )}
 
+      {players.length > 0 && <DeviceSection />}
+
       <DataSection />
 
       {deleteId && (
@@ -144,6 +147,32 @@ export default function Players() {
         />
       )}
     </div>
+  );
+}
+
+function DeviceSection() {
+  const { data } = useApp();
+  const [me, setMeState] = useState(() => resolveMe(data));
+  const players = [...data.players].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return (
+    <Card className="p-4">
+      <Label className="mb-1">Dieses Gerät</Label>
+      <p className="text-sm text-ink-2 mb-3">Wer schreibt auf diesem Handy? Sein Team steht auf der Tafel unten.</p>
+      <div className="flex flex-wrap gap-2">
+        {players.map((p) => (
+          <Chip
+            key={p.id}
+            active={me === p.id}
+            onClick={() => {
+              setMe(p.id);
+              setMeState(p.id);
+            }}
+          >
+            {p.name}
+          </Chip>
+        ))}
+      </div>
+    </Card>
   );
 }
 

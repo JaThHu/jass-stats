@@ -6,7 +6,8 @@ import { activeEvening, currentGame, startEvening } from '../lib/actions';
 import { formatDate, pct, teamName } from '../lib/format';
 import { todayIso } from '../lib/ids';
 import { PAIRING_LABELS, rotationInfo, sortEveningsDesc } from '../lib/rotation';
-import { gameWinner, roundsOfGame, totals } from '../lib/scoring';
+import { gameWinner, other, roundsOfGame, totals } from '../lib/scoring';
+import { myTeam, resolveMe } from '../lib/me';
 import { chritzPoints, playerStats, scopeToSeason, type Season } from '../lib/stats';
 import { CHRITZ_ICONS, type AppData } from '../lib/types';
 import { Avatar, Button, Card, Empty, Label, TeamDot } from '../components/ui';
@@ -23,12 +24,9 @@ export default function Home() {
   return (
     <div className="space-y-5">
       <header className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-3">
-          <img src="/logo.jpg" alt="" className="w-10 h-10 rounded-xl object-cover bg-white" />
-          <div>
-            <p className="text-lg font-bold leading-tight text-ink">Jass-Stats</p>
-            <p className="text-xs text-ink-3">{data.evenings.length} Abende erfasst</p>
-          </div>
+        <div>
+          <p className="text-[28px] font-bold leading-tight tracking-tight text-ink">Jass-Stats</p>
+          <p className="text-sm text-ink-3">{data.evenings.length} Abende erfasst</p>
         </div>
         <SyncBadge sync={sync} />
       </header>
@@ -126,6 +124,7 @@ function LiveCard({ data, eveningId }: { data: AppData; eveningId: string }) {
   const t = game ? totals(roundsOfGame(data, game.id)) : [0, 0];
   const winner = game ? gameWinner(data, game.id) : null;
   const cp = chritzPoints(data.chritz.filter((c) => c.eveningId === eveningId));
+  const mine = myTeam(ev, resolveMe(data));
 
   return (
     <button onClick={() => navigate('/tafel')} className="block w-full text-left">
@@ -138,7 +137,7 @@ function LiveCard({ data, eveningId }: { data: AppData; eveningId: string }) {
           <span className="text-xs text-ink-3">{formatDate(ev.date, 'short')}</span>
         </div>
         <div className="mt-4 space-y-2.5">
-          {[0, 1].map((i) => (
+          {[mine, other(mine)].map((i) => (
             <div key={i} className="flex items-center gap-3">
               <TeamDot team={i as 0 | 1} />
               <span className="flex-1 min-w-0 font-semibold text-ink truncate">{teamName(data, ev.teams[i])}</span>

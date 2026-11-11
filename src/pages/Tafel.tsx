@@ -19,10 +19,12 @@ import {
   gamesOfEvening,
   isWeisOnly,
   pendingEvents,
+  other,
   progression,
   roundsOfGame,
   weisPair,
 } from '../lib/scoring';
+import { myTeam, resolveMe } from '../lib/me';
 import { chritzPoints } from '../lib/stats';
 import { BERGPREIS_POINTS, CHRITZ_ICONS, CHRITZ_TYPES, type AppData, type Round, type TeamIndex } from '../lib/types';
 import { BoardSide } from '../components/tafel/Board';
@@ -72,6 +74,10 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
   const evening = data.evenings.find((e) => e.id === eveningId)!;
   const game = currentGame(data, eveningId);
   const names: [string, string] = [teamName(data, evening.teams[0]), teamName(data, evening.teams[1])];
+  // Mein Team steht unten (auf meiner Seite), das andere gedreht oben.
+  const bottom = myTeam(evening, resolveMe(data));
+  const top = other(bottom);
+  const order: [TeamIndex, TeamIndex] = [bottom, top];
 
   if (!game) {
     return (
@@ -96,6 +102,21 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
   const eveningChritz = data.chritz.filter((c) => c.eveningId === eveningId);
   const cp = chritzPoints(eveningChritz);
   const diff = total[0] - total[1];
+
+  const weisOf = (list: Round[]) => {
+    const sum = [0, 0];
+    const count = [0, 0];
+    for (const r of list) {
+      const w = weisPair(r);
+      for (const t of [0, 1] as TeamIndex[]) {
+        sum[t] += w[t] * r.multiplier;
+        if (w[t] > 0) count[t] += 1;
+      }
+    }
+    return { sum, count };
+  };
+  const weisGame = weisOf(rounds);
+  const weisEvening = weisOf(data.rounds.filter((r) => r.eveningId === eveningId));
 
   const saveRound = (input: Parameters<typeof addRound>[2]) => {
     setLastMultiplier(input.multiplier);
@@ -145,14 +166,15 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
       {/* ── Tafel ── */}
       <div className="rounded-3xl border border-line overflow-hidden bg-chalk shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <BoardSide
-          team={1}
-          name={names[1]}
-          total={total[1]}
+          team={top}
+          name={names[top]}
+          total={total[top]}
+          weis={weisGame.sum[top]}
           rotated
           bergpreisDone={bergpreisDone}
           disabled={winner !== null}
-          isWinner={winner === 1}
-          onAdd={() => setSheet({ team: 1, round: null })}
+          isWinner={winner === top}
+          onAdd={() => setSheet({ team: top, round: null })}
         />
         <div className="flex items-center gap-3 px-4 py-2 bg-black/25 border-y border-line">
           <div className="flex-1 h-px bg-white/10" />
@@ -168,13 +190,14 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
           <div className="flex-1 h-px bg-white/10" />
         </div>
         <BoardSide
-          team={0}
-          name={names[0]}
-          total={total[0]}
+          team={bottom}
+          name={names[bottom]}
+          total={total[bottom]}
+          weis={weisGame.sum[bottom]}
           bergpreisDone={bergpreisDone}
           disabled={winner !== null}
-          isWinner={winner === 0}
-          onAdd={() => setSheet({ team: 0, round: null })}
+          isWinner={winner === bottom}
+          onAdd={() => setSheet({ team: bottom, round: null })}
         />
       </div>
 
@@ -192,6 +215,29 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
         </Card>
       )}
 
+      {/* ── Weis-Übersicht ── */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <Label>Weis-Übersicht</Label>
+          <span className="text-[11px] text-ink-3">Partie {game.number}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {order.map((t) => (
+            <div key={t} className="rounded-xl bg-surface-2 border border-line p-3 min-w-0">
+              <p className="text-xs text-ink-2 flex items-center gap-1.5 min-w-0">
+                <TeamDot team={t} className="w-2 h-2" />
+                <span className="truncate">{names[t]}</span>
+              </p>
+              <p className="text-3xl font-bold text-weis mt-1.5 leading-none tabular">{weisGame.sum[t]}</p>
+              <p className="text-[11px] text-ink-3 mt-1.5">
+                {weisGame.count[t]}× gewiesen
+                {games.length > 1 && ` · Abend ${weisEvening.sum[t]}`}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       {/* ── Chritz heute ── */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
@@ -201,7 +247,7 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
           </Link>
         </div>
         <div className="space-y-2">
-          {([0, 1] as TeamIndex[]).map((t) => (
+          {order.map((t) => (
             <div key={t} className="flex items-center gap-2.5">
               <TeamDot team={t} />
               <span className="text-sm text-ink truncate flex-1 min-w-0">{names[t]}</span>
@@ -242,7 +288,7 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
               return (
                 <button
                   key={s.round.id}
-                  onClick={() => setSheet({ team: s.round.stichTeam ?? s.round.matchTeam ?? 0, round: s.round })}
+                  onClick={() => setSheet({ team: s.round.stichTeam ?? s.round.matchTeam ?? bottom, round: s.round })}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left active:bg-surface-2 transition-colors"
                 >
                   <span className="w-6 text-xs font-semibold text-ink-3 tabular">{n}</span>
@@ -255,10 +301,10 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
                         <Zap size={12} fill="currentColor" /> Match
                       </span>
                     )}
-                    {isWeisOnly(s.round) && <span className="font-semibold text-ink-2">Weis</span>}
+                    {isWeisOnly(s.round) && <span className="px-1.5 py-0.5 rounded bg-weis/15 text-weis font-bold">Weis</span>}
                     {!isWeisOnly(s.round) && w[0] + w[1] > 0 && <span>+Weis</span>}
                   </span>
-                  {([0, 1] as TeamIndex[]).map((t) => (
+                  {order.map((t) => (
                     <span key={t} className="w-[70px] flex items-center justify-end gap-1.5">
                       <span className={cx('font-semibold tabular', s.points[t] ? 'text-ink' : 'text-ink-3')}>{s.points[t]}</span>
                       <TeamDot team={t} className="w-2 h-2" />
@@ -287,6 +333,7 @@ function LiveTafel({ data, eveningId }: { data: AppData; eveningId: string }) {
         <RoundSheet
           key={sheet.round?.id ?? `new-${sheet.team}`}
           names={names}
+          order={order}
           initialTeam={sheet.team}
           round={sheet.round}
           roundNumber={sheet.round ? rounds.findIndex((r) => r.id === sheet.round!.id) + 1 : rounds.length + 1}
